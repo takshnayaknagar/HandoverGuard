@@ -1,0 +1,10 @@
+# HandoverGuard backend dependencies (Python 3.14, pinned 2026-10-11)
+
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+pydantic-settings==2.15.0
+python-dotenv==1.2.4
+
+# Testing (httpx is required by FastAPI's TestClient)
+pytest==9.1.1
+httpx==0.28.1
