@@ -27,10 +27,8 @@ The backend does not record audio, perform speech-to-text, or implement the fron
 * FastAPI
 * Uvicorn
 * Pydantic
-* One LLM provider SDK
+* Google Gemini via the official `google-genai` SDK
 * pytest for automated testing
-
-The LLM provider will be selected after checking API access, structured-output support, and current pricing.
 
 ## Expected Workflow
 
@@ -63,7 +61,7 @@ Checks whether the backend is running.
 
 ### POST /process-handover
 
-Accepts a transcript and returns a handover.
+Accepts a transcript, sends ONE Gemini call with schema-constrained JSON output, independently re-validates the result against the six-field schema, and returns the handover draft.
 
 Example request:
 
@@ -77,36 +75,37 @@ Example response:
 
 ```
 {
-  "patient_reference": null,
-  "completed": [],
+  "patient_reference": "Bed 4",
+  "completed": ["Morning medications given"],
   "pending": ["Blood test results are pending"],
-  "follow_up": ["Cardiology review tomorrow"],
-  "communication": [],
-  "unclear_or_undocumented": []
+  "follow_up": ["Cardiology review tomorrow at 10am"],
+  "communication": ["Spoke with the daughter about the plan"],
+  "unclear_or_undocumented": ["Not sure if the evening antibiotics were given"]
 }
 ```
 
-Validation behaviour:
+Error responses always use one shape:
 
-| Case | Status | Body |
+```
+{ "error": { "code": "<machine_code>", "message": "<safe, human-readable>" } }
+```
+
+| Situation | Status | `code` |
 | --- | --- | --- |
-| Valid transcript | 200 | Handover response (six fields) |
-| Missing, empty, or whitespace-only transcript | 422 / 400 | Error object |
-| Transcript longer than `MAX_TRANSCRIPT_CHARS` (default 10000) | 400 | Error object |
+| Empty or whitespace-only transcript | 400 | `invalid_input` |
+| Transcript over `MAX_TRANSCRIPT_CHARS` (default 10000) | 400 | `invalid_input` |
+| Missing `transcript` field / malformed JSON body | 422 | FastAPI validation detail |
+| `GEMINI_API_KEY` not configured on the server | 503 | `llm_not_configured` |
+| Provider rejected credentials or quota/rate limit | 503 | `llm_auth_or_quota` |
+| Provider unreachable or failing (after one bounded retry) | 503 | `llm_unavailable` |
+| Overall processing deadline (~30 s) expired | 504 | `processing_timeout` |
+| Provider returned empty/blocked/schema-invalid output | 502 | `llm_invalid_response` |
 
-Empty/whitespace-only and over-length transcripts return:
-
-```
-{
-  "error": { "code": "invalid_input", "message": "..." }
-}
-```
-
-A missing `transcript` field or a malformed JSON body returns FastAPI's standard 422 validation error.
+Error messages never contain the API key or raw provider responses.
 
 CORS is enabled only for `FRONTEND_ORIGIN` (default `http://localhost:3000`).
 
-**Current status: processing is MOCKED.** Until Stage 3 integrates the LLM, every valid request returns the same fixed placeholder handover that clearly states no analysis has been performed. Input validation, however, is real. Do not treat mock responses as clinical output.
+**The output is an unverified draft that requires clinician review.** The extraction prompt forbids inventing facts: a mentioned task is never treated as completed, ambiguous or incomplete medication instructions are flagged in `unclear_or_undocumented` instead of guessed, `patient_reference` stays null unless explicitly stated, and an empty list means "not documented" — never "nothing outstanding". Transcript content is treated as untrusted data, not as instructions.
 
 ## Development Status
 
@@ -114,8 +113,8 @@ The backend will be developed in stages:
 
 1. Project setup and health endpoint. (complete)
 2. Transcript input and mock response. (complete)
-3. LLM integration.
-4. Output validation and error handling.
+3. LLM integration (Google Gemini). (complete)
+4. Output validation and error handling. (implemented in Stage 3)
 5. Automated tests.
 6. Frontend integration.
 7. Documentation and final verification.
@@ -161,9 +160,14 @@ Open the following local URLs:
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` when the LLM provider has been selected.
+Copy `.env.example` to `.env` and add your Gemini API key (free key at https://aistudio.google.com):
 
-Add your actual API key only to `.env` or another secure local configuration method.
+```
+GEMINI_API_KEY=your-key-here
+LLM_MODEL=gemini-3.8-flash
+```
+
+The model must be one currently available to your account — if the API reports a model is no longer available, update `LLM_MODEL` in both `.env` and `.env.example`.
 
 Never commit `.env` or expose API keys in frontend code.
 
@@ -175,7 +179,7 @@ Run automated tests with:
 pytest
 ```
 
-Tests should use fictional transcripts and mocked LLM responses where possible, so they do not require paid API calls.
+All automated tests are mocked and make no network calls. The suite includes one opt-in live test against the real Gemini API (clearly fictional transcript); it is skipped unless `RUN_LIVE_TESTS=1` is set AND `GEMINI_API_KEY` is configured.
 
 ## Safety and Limitations
 

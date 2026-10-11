@@ -25,10 +25,14 @@ class Settings(BaseSettings):
     # Input limits
     max_transcript_chars: int = 10_000
 
-    # LLM configuration (used from Stage 3 onwards; not needed for /health)
+    # LLM configuration
     llm_provider: str = "gemini"
-    llm_model: str = "gemini-2.5-flash"
+    llm_model: str = "gemini-3.8-flash"
     gemini_api_key: str = ""
+
+    # Overall deadline for ONE /process-handover LLM call, in seconds.
+    # Shared across the initial attempt and the single allowed retry.
+    llm_timeout_seconds: float = 30.0
 
 
 settings = Settings()

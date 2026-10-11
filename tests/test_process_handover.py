@@ -1,12 +1,51 @@
-"""Tests for POST /process-handover (Stage 2: mock processing, no LLM)."""
+"""Tests for POST /process-handover.
 
+Validation tests (empty/whitespace/length/missing field) never reach the LLM.
+Success and failure-mapping tests mock the LLM boundary
+(main.process_transcript_with_llm), so no network call is ever made.
+"""
+
+import pytest
 from fastapi.testclient import TestClient
 
+from app import ai_service
 from app.config import settings
-from app.mock_service import MOCK_NOTICE
+from app.schemas import HandoverResponse
+import main
+
+SAMPLE_HANDOVER = HandoverResponse(
+    patient_reference="Bed 4",
+    completed=["Morning medications given"],
+    pending=["Blood test results pending"],
+    follow_up=["Cardiology review tomorrow"],
+    communication=["Family updated"],
+    unclear_or_undocumented=[],
+)
 
 
-def test_valid_transcript_returns_ok(client: TestClient):
+@pytest.fixture()
+def mock_llm_success(monkeypatch):
+    monkeypatch.setattr(main, "process_transcript_with_llm", lambda transcript: SAMPLE_HANDOVER)
+
+
+@pytest.fixture()
+def mock_llm_error(monkeypatch):
+    def install(error):
+        def raise_error(transcript):
+            raise error
+
+        monkeypatch.setattr(main, "process_transcript_with_llm", raise_error)
+
+    return install
+
+
+def test_health_still_ok(client: TestClient):
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_valid_transcript_returns_six_field_handover(client: TestClient, mock_llm_success):
     response = client.post(
         "/process-handover",
         json={"transcript": "Blood test results are pending. Cardiology review tomorrow."},
@@ -22,10 +61,12 @@ def test_valid_transcript_returns_ok(client: TestClient):
         "communication",
         "unclear_or_undocumented",
     }
-    assert body["patient_reference"] is None
-    for field in ("completed", "pending", "follow_up", "communication"):
-        assert body[field] == []
-    assert body["unclear_or_undocumented"] == [MOCK_NOTICE]
+    assert body["patient_reference"] == "Bed 4"
+    assert body["completed"] == ["Morning medications given"]
+    assert body["pending"] == ["Blood test results pending"]
+    assert body["follow_up"] == ["Cardiology review tomorrow"]
+    assert body["communication"] == ["Family updated"]
+    assert body["unclear_or_undocumented"] == []
 
 
 def test_empty_transcript_rejected(client: TestClient):
@@ -42,7 +83,7 @@ def test_whitespace_only_transcript_rejected(client: TestClient):
     assert response.json()["error"]["code"] == "invalid_input"
 
 
-def test_transcript_exactly_at_limit_accepted(client: TestClient):
+def test_transcript_exactly_at_limit_accepted(client: TestClient, mock_llm_success):
     limit = settings.max_transcript_chars
     response = client.post("/process-handover", json={"transcript": "a" * limit})
 
@@ -63,3 +104,48 @@ def test_missing_transcript_field_rejected(client: TestClient):
     response = client.post("/process-handover", json={})
 
     assert response.status_code == 422
+
+
+def test_not_configured_maps_to_503(client: TestClient, mock_llm_error):
+    mock_llm_error(ai_service.LLMNotConfiguredError())
+
+    response = client.post("/process-handover", json={"transcript": "hello"})
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "llm_not_configured"
+
+
+def test_auth_or_quota_maps_to_503(client: TestClient, mock_llm_error):
+    mock_llm_error(ai_service.LLMAuthOrQuotaError())
+
+    response = client.post("/process-handover", json={"transcript": "hello"})
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "llm_auth_or_quota"
+
+
+def test_unavailable_maps_to_503(client: TestClient, mock_llm_error):
+    mock_llm_error(ai_service.LLMUnavailableError())
+
+    response = client.post("/process-handover", json={"transcript": "hello"})
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "llm_unavailable"
+
+
+def test_timeout_maps_to_504(client: TestClient, mock_llm_error):
+    mock_llm_error(ai_service.LLMTimeoutError())
+
+    response = client.post("/process-handover", json={"transcript": "hello"})
+
+    assert response.status_code == 504
+    assert response.json()["error"]["code"] == "processing_timeout"
+
+
+def test_invalid_model_output_maps_to_502(client: TestClient, mock_llm_error):
+    mock_llm_error(ai_service.LLMInvalidResponseError())
+
+    response = client.post("/process-handover", json={"transcript": "hello"})
+
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "llm_invalid_response"
