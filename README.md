@@ -94,7 +94,7 @@ Error responses always use one shape:
 | --- | --- | --- |
 | Empty or whitespace-only transcript | 400 | `invalid_input` |
 | Transcript over `MAX_TRANSCRIPT_CHARS` (default 10000) | 400 | `invalid_input` |
-| Missing `transcript` field / malformed JSON body | 422 | FastAPI validation detail |
+| Missing `transcript` field, wrong type, or malformed JSON body | 422 | `invalid_request_body` |
 | `GEMINI_API_KEY` not configured on the server | 503 | `llm_not_configured` |
 | Provider rejected credentials or quota/rate limit | 503 | `llm_auth_or_quota` |
 | Provider unreachable or failing (after one bounded retry) | 503 | `llm_unavailable` |
