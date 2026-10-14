@@ -1,53 +1,59 @@
 # Environment variables and secrets
-
 .env
 .env.*
 !.env.example
 
 # Python virtual environments
-
 .venv/
 venv/
 env/
 
 # Python generated files
-
 __pycache__/
 *.py[cod]
 *.pyo
 
-# Test and coverage files
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
+# Test and coverage files
 .pytest_cache/
 .coverage
 htmlcov/
 
 # Type checking and linting caches
-
 .mypy_cache/
 .ruff_cache/
 
 # IDE and editor files
-
 .vscode/
 .idea/
-
-# Operating system files
-
+!.vscode/extensions.json
 .DS_Store
 Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # Local logs
-
 *.log
 
 # Local databases and temporary data
-
 *.db
 *.sqlite3
 tmp/
 temp/
 
 # Never commit real patient data or private recordings.
-
 # Keep only intentionally created, fictional demo data in version control.

@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Brand custom palette */
+    --color-gold: #edae49;
+    --color-coral: #d1495b;
+    --color-teal: #00798c;
+    --color-blue: #30638e;
+    --color-navy: #003d5b;
+
+    /* Theme tokens - Light mode default */
+    --bg-main: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-card-muted: #f1f5f9;
+    --bg-input: #f8fafc;
+    --border-main: #e2e8f0;
+    --border-card: #e2e8f0;
+    --text-primary: #003d5b;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --nav-bg: rgba(255, 255, 255, 0.85);
+  }
+
+  .dark {
+    /* Theme tokens - Dark mode */
+    --bg-main: #021a27;
+    --bg-card: #002b40;
+    --bg-card-muted: #003852;
+    --bg-input: #002233;
+    --border-main: #004d73;
+    --border-card: #004566;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --nav-bg: rgba(0, 43, 64, 0.88);
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    @apply antialiased font-sans transition-colors duration-200;
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
