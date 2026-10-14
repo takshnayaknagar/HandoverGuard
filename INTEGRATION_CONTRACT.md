@@ -1,3 +1,31 @@
+# ⚠️ SUPERSEDED — DO NOT IMPLEMENT FROM THIS DOCUMENT
+
+This document was written before the backend integration and describes the
+original planned contract (multipart `POST /api/handover/process` with audio
+upload and a rich object response). **That contract is NOT the active one.**
+
+**Active integration flow (working and tested):**
+
+1. The frontend sends manual transcript text as JSON:
+   `POST /api/process-handover` with body `{"transcript": "..."}`.
+2. `/api` is a Vite development-proxy prefix only (`vite.config.ts` forwards
+   `/api/*` to `http://127.0.0.1:8000`, stripping the prefix). The backend
+   route itself is `POST /process-handover`.
+3. The backend returns the six-field handover:
+   `{"patient_reference": string|null, "completed": [], "pending": [],
+   "follow_up": [], "communication": [], "unclear_or_undocumented": []}`
+   (string arrays except `patient_reference`).
+4. The adapter (`src/services/handoverApi.ts`) maps these fields to the UI
+   categories (pending / followup / completed / communication / verification).
+
+**Audio transcription is NOT integrated yet** (awaiting Person 2's
+speech-to-text work). Audio-only submissions are rejected with an honest
+error; manual text entry is the working path.
+
+The original spec below is kept for historical context only.
+
+---
+
 # HandoverGuard Frontend Integration Spec (Person 1 ⟷ Person 2)
 
 This document specifies the exact contract between Person 1 (Frontend) and Person 2 (Backend / AI Pipeline).

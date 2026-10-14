@@ -181,6 +181,59 @@ pytest
 
 All automated tests are mocked and make no network calls. The suite includes one opt-in live test against the real Gemini API (clearly fictional transcript); it is skipped unless `RUN_LIVE_TESTS=1` is set AND `GEMINI_API_KEY` is configured.
 
+## Frontend Integration (Person 1's React app)
+
+The repository now contains both the FastAPI backend (repo root: `main.py`, `app/`) and the React + Vite frontend (repo root: `src/`, `package.json`). npm is the package manager.
+
+### Running both apps (development)
+
+Backend (repo root):
+
+```
+.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+Frontend (repo root, second terminal):
+
+```
+npm install
+npm run dev
+```
+
+Expected local addresses:
+
+* Frontend dashboard: http://localhost:5173
+* Backend API: http://127.0.0.1:8000 (health check at http://127.0.0.1:8000/health; interactive docs at http://127.0.0.1:8000/docs)
+
+### How the frontend reaches the backend
+
+The frontend calls `/api/process-handover` (same origin). The Vite development
+server (`vite.config.ts`) proxies `/api/*` to `http://127.0.0.1:8000` and strips
+the `/api` prefix, so the backend receives its normal `POST /process-handover`.
+No CORS changes are needed in development. Note: `INTEGRATION_CONTRACT.md`
+describes an older planned contract and is superseded — this section and
+"API Endpoints" above describe the real one.
+
+### End-to-end test (synthetic data only)
+
+1. Start both apps as above.
+2. Open http://localhost:5173 and paste a fictional transcript into
+   "Manual Notes / Transcript Backup", e.g.:
+   "Patient 104. Blood pressure was checked at 2 PM and recorded as 120 over 80.
+   Blood test result is still pending. The patient's family asked about the
+   expected discharge time. An ECG was requested, but the note does not confirm
+   whether it was completed."
+3. Click **Generate Handover** — the dashboard should show real AI output:
+   the blood test under Pending, the family question under Communication, and
+   the unconfirmed ECG under Needs Verification (never marked as missed).
+
+Current limitation: **audio recording/upload is not connected to transcription
+yet** (awaiting Person 2's speech-to-text integration). Audio-only submissions
+show an honest error; manual text entry is the working path.
+
+Generated handovers are **unverified drafts that require clinician review**,
+and all demo/testing transcripts must use synthetic patient data only.
+
 ## Safety and Limitations
 
 HandoverGuard is a prototype for organizing documented information. It is not a diagnostic system and must not replace clinical judgment or professional verification.
