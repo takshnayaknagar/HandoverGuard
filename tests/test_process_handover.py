@@ -104,6 +104,27 @@ def test_missing_transcript_field_rejected(client: TestClient):
     response = client.post("/process-handover", json={})
 
     assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "invalid_request_body"
+    assert "transcript" in error["message"]
+
+
+def test_wrong_type_transcript_rejected(client: TestClient):
+    response = client.post("/process-handover", json={"transcript": 123})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_request_body"
+
+
+def test_malformed_json_body_rejected(client: TestClient):
+    response = client.post(
+        "/process-handover",
+        content="{not valid json",
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_request_body"
 
 
 def test_not_configured_maps_to_503(client: TestClient, mock_llm_error):

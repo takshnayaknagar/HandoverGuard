@@ -11,7 +11,8 @@ mapping, and one overall deadline shared by at most two attempts.
 The handover result is an UNVERIFIED DRAFT for clinician review.
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -44,6 +45,19 @@ app.add_middleware(
 def _error_response(status_code: int, code: str, message: str) -> JSONResponse:
     """The single predictable error shape used across the API."""
     return JSONResponse(status_code=status_code, content={"error": {"code": code, "message": message}})
+
+
+@app.exception_handler(RequestValidationError)
+def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Unify request-body validation failures (missing field, wrong type, bad JSON)
+    into the standard error shape instead of FastAPI's default {"detail": [...]}.
+    Validation details are kept generic: no transcript content is echoed back.
+    """
+    return _error_response(
+        422,
+        "invalid_request_body",
+        "Request body must be JSON with a non-empty 'transcript' string field.",
+    )
 
 
 @app.get("/health")
