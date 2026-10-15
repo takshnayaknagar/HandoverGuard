@@ -55,5 +55,8 @@ Thumbs.db
 tmp/
 temp/
 
+# Keep local audio test recordings (synthetic demo wavs) out of Git.
+*.wav
+
 # Never commit real patient data or private recordings.
 # Keep only intentionally created, fictional demo data in version control.

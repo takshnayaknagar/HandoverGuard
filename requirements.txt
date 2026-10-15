@@ -6,6 +6,13 @@ pydantic-settings==2.15.0
 python-dotenv==1.2.4
 groq==1.7.0
 
+# Speech-to-text (local faster-whisper; ctranslate2 is its binary engine)
+faster-whisper==1.2.1
+ctranslate2==4.8.3
+# av 19 dropped the metadata_errors argument that faster-whisper 1.2.1 uses
+av==18.1.0
+python-multipart==0.0.32
+
 # Testing (httpx is required by FastAPI's TestClient)
 pytest==9.1.1
 httpx==0.28.1

@@ -234,6 +234,33 @@ show an honest error; manual text entry is the working path.
 Generated handovers are **unverified drafts that require clinician review**,
 and all demo/testing transcripts must use synthetic patient data only.
 
+## Speech-to-Text (POST /transcribe)
+
+The backend also runs **local** speech-to-text (faster-whisper, Whisper "base" model, CPU int8 — same configuration as Person 2's transcription work). No audio is sent to any external service.
+
+```
+POST /transcribe   (multipart/form-data, field "audio")
+```
+
+* Success: `200 {"transcript": "recognized text"}`.
+* Supported formats: WAV, MP3, OGG, M4A, WEBM — validated by file-content signature; filename and declared MIME type are not trusted.
+* Limits: max 25 MB (`MAX_AUDIO_MB`), enforced while streaming; uploads are written to a temporary file outside the repository and deleted on every request path — except that a timed-out transcription, whose worker thread continues server-side, deletes its own file when it eventually finishes (on Windows the file cannot be removed while the decoder still holds it open).
+* Errors: `audio_invalid` / `audio_too_large` (400), `stt_model_error` (503), `stt_busy` (503 — bounded concurrent jobs), `stt_timeout` (504).
+
+### First-run model download and demo preparation
+
+The ~150 MB Whisper model downloads automatically on the **first** `/transcribe` request. To avoid a delay during a demo, warm it up once beforehand:
+
+```
+.venv\Scripts\python.exe -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='int8')"
+```
+
+Expected CPU latency is roughly real-time (a 60-second note takes about 30–90 seconds to transcribe). Keep demo recordings short.
+
+### Important limitation
+
+**Transcription is not guaranteed accurate.** The returned transcript must be reviewed and edited by a clinician in the frontend before clicking Generate — only the reviewed text is sent to `/process-handover`. A transcription timeout bounds the API response but does not cancel the CPU work server-side (documented behaviour).
+
 ## Safety and Limitations
 
 HandoverGuard is a prototype for organizing documented information. It is not a diagnostic system and must not replace clinical judgment or professional verification.

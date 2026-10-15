@@ -34,5 +34,10 @@ class Settings(BaseSettings):
     # Shared across the initial attempt and the single allowed retry.
     llm_timeout_seconds: float = 30.0
 
+    # Speech-to-text settings (local faster-whisper)
+    stt_timeout_seconds: float = 180.0
+    max_audio_mb: int = 25
+    stt_max_concurrent: int = 2
+
 
 settings = Settings()
