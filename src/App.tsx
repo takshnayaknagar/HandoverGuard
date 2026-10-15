@@ -336,8 +336,6 @@ export const App: React.FC = () => {
             <span>Clinical Continuity & Patient Safety System</span>
           </div>
           <div className="flex items-center gap-4 text-[var(--text-muted)]">
-            <span>Person 1: Frontend & UI</span>
-            <span>•</span>
             <span>Theme: {isDark ? 'Dark Mode' : 'Light Mode'}</span>
           </div>
         </div>
