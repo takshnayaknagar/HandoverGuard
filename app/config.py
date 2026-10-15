@@ -1,7 +1,7 @@
 """Application settings, loaded from environment variables and an optional .env file.
 
 Every setting has a sensible default, so the app starts even without a .env file.
-Secrets (like GEMINI_API_KEY) are only ever read from the environment — never
+Secrets (like GROQ_API_KEY) are only ever read from the environment — never
 hardcoded here and never written to logs.
 """
 
@@ -26,9 +26,9 @@ class Settings(BaseSettings):
     max_transcript_chars: int = 10_000
 
     # LLM configuration
-    llm_provider: str = "gemini"
-    llm_model: str = "gemini-3.8-flash"
-    gemini_api_key: str = ""
+    llm_provider: str = "groq"
+    llm_model: str = "openai/gpt-oss-120b"
+    groq_api_key: str = ""
 
     # Overall deadline for ONE /process-handover LLM call, in seconds.
     # Shared across the initial attempt and the single allowed retry.

@@ -21,10 +21,8 @@ class HandoverResponse(BaseModel):
     a patient or bed reference. An empty list means "nothing documented in
     this category" — never "nothing outstanding".
 
-    NOTE: do not add model_config extras (e.g. extra="forbid") here — the JSON
-    schema of this model is sent to Gemini as response_schema, and additional
-    JSON-schema keywords such as additionalProperties are rejected by the API.
-    Strictness for LLM output is enforced in app/ai_service.py instead.
+    NOTE: LLM-output strictness (exact key set + types) is enforced in
+    app/ai_service.py, independent of provider.
     """
 
     patient_reference: str | None = None
