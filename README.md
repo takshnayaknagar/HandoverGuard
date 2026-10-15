@@ -27,7 +27,7 @@ The backend does not record audio, perform speech-to-text, or implement the fron
 * FastAPI
 * Uvicorn
 * Pydantic
-* Google Gemini via the official `google-genai` SDK
+* Groq via the official `groq` SDK (`openai/gpt-oss-120b`)
 * pytest for automated testing
 
 ## Expected Workflow
@@ -61,7 +61,7 @@ Checks whether the backend is running.
 
 ### POST /process-handover
 
-Accepts a transcript, sends ONE Gemini call with schema-constrained JSON output, independently re-validates the result against the six-field schema, and returns the handover draft.
+Accepts a transcript, sends ONE Groq call with strict schema-constrained JSON output, independently re-validates the result against the six-field schema, and returns the handover draft.
 
 Example request:
 
@@ -95,7 +95,7 @@ Error responses always use one shape:
 | Empty or whitespace-only transcript | 400 | `invalid_input` |
 | Transcript over `MAX_TRANSCRIPT_CHARS` (default 10000) | 400 | `invalid_input` |
 | Missing `transcript` field, wrong type, or malformed JSON body | 422 | `invalid_request_body` |
-| `GEMINI_API_KEY` not configured on the server | 503 | `llm_not_configured` |
+| `GROQ_API_KEY` not configured on the server | 503 | `llm_not_configured` |
 | Provider rejected credentials or quota/rate limit | 503 | `llm_auth_or_quota` |
 | Provider unreachable or failing (after one bounded retry) | 503 | `llm_unavailable` |
 | Overall processing deadline (~30 s) expired | 504 | `processing_timeout` |
@@ -113,7 +113,7 @@ The backend will be developed in stages:
 
 1. Project setup and health endpoint. (complete)
 2. Transcript input and mock response. (complete)
-3. LLM integration (Google Gemini). (complete)
+3. LLM integration (Groq, migrated from Gemini). (complete)
 4. Output validation and error handling. (implemented in Stage 3)
 5. Automated tests.
 6. Frontend integration.
@@ -160,14 +160,14 @@ Open the following local URLs:
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and add your Gemini API key (free key at https://aistudio.google.com):
+Copy `.env.example` to `.env` and add your Groq API key (free key at https://console.groq.com/keys):
 
 ```
-GEMINI_API_KEY=your-key-here
-LLM_MODEL=gemini-3.8-flash
+GROQ_API_KEY=your-key-here
+LLM_MODEL=openai/gpt-oss-120b
 ```
 
-The model must be one currently available to your account — if the API reports a model is no longer available, update `LLM_MODEL` in both `.env` and `.env.example`.
+The model must support strict JSON-schema structured outputs — `openai/gpt-oss-120b` and `openai/gpt-oss-20b` do. If the API reports a model is unavailable, update `LLM_MODEL` in both `.env` and `.env.example`.
 
 Never commit `.env` or expose API keys in frontend code.
 
@@ -179,7 +179,7 @@ Run automated tests with:
 pytest
 ```
 
-All automated tests are mocked and make no network calls. The suite includes one opt-in live test against the real Gemini API (clearly fictional transcript); it is skipped unless `RUN_LIVE_TESTS=1` is set AND `GEMINI_API_KEY` is configured.
+All automated tests are mocked and make no network calls. The suite includes one opt-in live test against the real Groq API (clearly fictional transcript); it is skipped unless `RUN_LIVE_TESTS=1` is set AND `GROQ_API_KEY` is configured.
 
 ## Frontend Integration (Person 1's React app)
 

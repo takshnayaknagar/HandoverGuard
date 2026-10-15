@@ -1,6 +1,6 @@
 """Unit tests for app/ai_service.py — fully mocked, zero network calls.
 
-The genai Client is replaced by fakes via ai_service._client_for_attempt, so
+The Groq client is replaced by fakes via ai_service._client_for_attempt, so
 no API key is needed and no request ever leaves the machine. The one live
 test at the bottom is strictly opt-in and shows up as SKIPPED by default.
 """
@@ -10,7 +10,6 @@ import os
 
 import httpx
 import pytest
-from google.genai import errors as genai_errors
 
 from app import ai_service
 from app.ai_service import (
@@ -31,32 +30,68 @@ VALID_JSON = (
 )
 
 
+def _fake_http_response(status_code: int):
+    request = httpx.Request("POST", "https://api.groq.com/test")
+    return httpx.Response(status_code=status_code, request=request)
+
+
+def groq_server_error():
+    import groq
+
+    return groq.InternalServerError(
+        message="transient provider failure", response=_fake_http_response(500), body=None
+    )
+
+
+def groq_client_error(status_code: int):
+    import groq
+
+    return groq.APIStatusError(
+        message="provider rejected", response=_fake_http_response(status_code), body=None
+    )
+
+
+class FakeMessage:
+    def __init__(self, content):
+        self.content = content
+
+
+class FakeChoice:
+    def __init__(self, content):
+        self.message = FakeMessage(content)
+
+
 class FakeResponse:
-    def __init__(self, text):
-        self.text = text
+    def __init__(self, content):
+        self.choices = [FakeChoice(content)]
 
 
-class FakeModels:
+class FakeCompletions:
     def __init__(self, script):
         self._script = list(script)
         self.calls = []
 
-    def generate_content(self, model, contents, config):
-        self.calls.append({"model": model, "contents": contents, "config": config})
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
         step = self._script.pop(0)
         if isinstance(step, Exception):
             raise step
         return step
 
 
+class FakeChat:
+    def __init__(self, script):
+        self.completions = FakeCompletions(script)
+
+
 class FakeClient:
     def __init__(self, script):
-        self.models = FakeModels(script)
+        self.chat = FakeChat(script)
 
 
 @pytest.fixture()
 def fake_llm(monkeypatch):
-    """Replace the real Gemini client with a scripted fake; use a dummy key."""
+    """Replace the real Groq client with a scripted fake; use a dummy key."""
     budgets = []
 
     def install(script):
@@ -67,7 +102,7 @@ def fake_llm(monkeypatch):
             return fake
 
         monkeypatch.setattr(ai_service, "_client_for_attempt", fake_client_factory)
-        monkeypatch.setattr(ai_service.settings, "gemini_api_key", "dummy-key-for-tests")
+        monkeypatch.setattr(ai_service.settings, "groq_api_key", "dummy-key-for-tests")
         return fake
 
     install.budgets = budgets
@@ -88,14 +123,29 @@ def test_successful_extraction_returns_validated_handover(fake_llm):
     assert result.unclear_or_undocumented == []
 
 
-def test_call_is_schema_constrained_json(fake_llm):
+def test_call_is_strict_json_schema_constrained(fake_llm):
     fake = fake_llm([FakeResponse(VALID_JSON)])
 
     process_transcript_with_llm("Some transcript.")
 
-    config = fake.models.calls[0]["config"]
-    assert config.response_mime_type == "application/json"
-    assert config.response_schema is HandoverResponse
+    call = fake.chat.completions.calls[0]
+    rf = call["response_format"]
+    assert rf["type"] == "json_schema"
+    assert rf["json_schema"]["strict"] is True
+    schema = rf["json_schema"]["schema"]
+    assert set(schema["required"]) == set(HandoverResponse.model_fields.keys())
+    assert schema["additionalProperties"] is False
+    assert call["model"] == settings.llm_model
+
+
+def test_prompt_contains_transcript_and_json_instruction(fake_llm):
+    fake = fake_llm([FakeResponse(VALID_JSON)])
+
+    process_transcript_with_llm("Morning medications given.")
+
+    content = fake.chat.completions.calls[0]["messages"][0]["content"]
+    assert "Morning medications given." in content
+    assert "JSON" in content  # Groq JSON mode requires the word JSON in the prompt
 
 
 def test_attempt_timeout_is_bounded_by_overall_budget(fake_llm):
@@ -158,63 +208,70 @@ def test_unknown_keys_are_rejected_not_ignored(fake_llm):
 
 
 def test_server_error_retries_once_then_succeeds(fake_llm):
-    fake = fake_llm(
-        [
-            genai_errors.ServerError(500, {"error": {"message": "transient"}}),
-            FakeResponse(VALID_JSON),
-        ]
-    )
+    fake = fake_llm([groq_server_error(), FakeResponse(VALID_JSON)])
 
     result = process_transcript_with_llm("Some transcript.")
 
     assert result.patient_reference == "Bed 4"
-    assert len(fake.models.calls) == 2  # initial attempt + the single retry
+    assert len(fake.chat.completions.calls) == 2  # initial attempt + the single retry
 
 
 def test_repeated_server_errors_exhaust_retries(fake_llm):
-    fake_llm(
-        [
-            genai_errors.ServerError(503, {"error": {"message": "down"}}),
-            genai_errors.ServerError(503, {"error": {"message": "still down"}}),
-        ]
-    )
+    fake_llm([groq_server_error(), groq_server_error()])
 
     with pytest.raises(LLMUnavailableError):
         process_transcript_with_llm("Some transcript.")
 
 
 def test_network_error_retries_then_gives_up(fake_llm):
-    fake_llm([httpx.ConnectError("connection refused"), httpx.ConnectError("connection refused")])
+    import groq
+
+    fake_llm(
+        [
+            groq.APIConnectionError(message="connection refused", request=_fake_http_response(0).request),
+            groq.APIConnectionError(message="connection refused", request=_fake_http_response(0).request),
+        ]
+    )
 
     with pytest.raises(LLMUnavailableError):
         process_transcript_with_llm("Some transcript.")
 
 
 def test_rate_limit_maps_to_auth_or_quota(fake_llm):
-    fake_llm([genai_errors.ClientError(429, {"error": {"message": "quota"}})])
+    import groq
+
+    fake_llm(
+        [groq.RateLimitError(message="quota", response=_fake_http_response(429), body=None)]
+    )
 
     with pytest.raises(LLMAuthOrQuotaError):
         process_transcript_with_llm("Some transcript.")
 
 
 def test_invalid_credentials_map_to_auth_or_quota(fake_llm):
-    fake_llm([genai_errors.ClientError(401, {"error": {"message": "bad key"}})])
+    import groq
+
+    fake_llm(
+        [groq.AuthenticationError(message="bad key", response=_fake_http_response(401), body=None)]
+    )
 
     with pytest.raises(LLMAuthOrQuotaError):
         process_transcript_with_llm("Some transcript.")
 
 
 def test_other_client_errors_do_not_retry(fake_llm):
-    fake = fake_llm([genai_errors.ClientError(400, {"error": {"message": "bad request"}})])
+    fake = fake_llm([groq_client_error(400)])
 
     with pytest.raises(LLMUnavailableError):
         process_transcript_with_llm("Some transcript.")
 
-    assert len(fake.models.calls) == 1  # non-transient: no retry attempted
+    assert len(fake.chat.completions.calls) == 1  # non-transient: no retry attempted
 
 
-def test_httpx_timeout_maps_to_processing_timeout(fake_llm):
-    fake_llm([httpx.ReadTimeout("timed out")])
+def test_sdk_timeout_maps_to_processing_timeout(fake_llm):
+    import groq
+
+    fake_llm([groq.APITimeoutError(request=_fake_http_response(0).request)])
 
     with pytest.raises(LLMTimeoutError):
         process_transcript_with_llm("Some transcript.")
@@ -222,7 +279,7 @@ def test_httpx_timeout_maps_to_processing_timeout(fake_llm):
 
 def test_missing_api_key_fails_fast_without_network(fake_llm, monkeypatch):
     fake_llm([])  # installs dummy key + factory that records whether it is called
-    monkeypatch.setattr(ai_service.settings, "gemini_api_key", "")
+    monkeypatch.setattr(ai_service.settings, "groq_api_key", "")
 
     with pytest.raises(LLMNotConfiguredError):
         process_transcript_with_llm("Some transcript.")
@@ -230,15 +287,15 @@ def test_missing_api_key_fails_fast_without_network(fake_llm, monkeypatch):
     assert fake_llm.budgets == []  # no client was ever constructed
 
 
-live_enabled = os.environ.get("RUN_LIVE_TESTS") == "1" and bool(settings.gemini_api_key)
+live_enabled = os.environ.get("RUN_LIVE_TESTS") == "1" and bool(settings.groq_api_key)
 
 
 @pytest.mark.skipif(
     not live_enabled,
-    reason="Opt-in live test: requires RUN_LIVE_TESTS=1 and GEMINI_API_KEY configured.",
+    reason="Opt-in live test: requires RUN_LIVE_TESTS=1 and GROQ_API_KEY configured.",
 )
-def test_live_gemini_fictional_transcript():
-    """Real API call against Gemini with a clearly fictional transcript.
+def test_live_groq_fictional_transcript():
+    """Real API call against Groq with a clearly fictional transcript.
 
     Never runs in the default suite: pytest -v shows this as SKIPPED unless
     RUN_LIVE_TESTS=1 is exported AND a key is configured.

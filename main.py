@@ -5,7 +5,7 @@ Run locally with:
 
 Stage 1: GET /health — liveness check, independent of any LLM configuration.
 Stage 2: POST /process-handover — transcript validation + API contract.
-Stage 3: real Gemini extraction with schema-constrained output, typed error
+Stage 3: real LLM extraction (Groq) with schema-constrained output, typed error
 mapping, and one overall deadline shared by at most two attempts.
 
 The handover result is an UNVERIFIED DRAFT for clinician review.
@@ -30,7 +30,7 @@ from app.schemas import HandoverRequest, HandoverResponse
 app = FastAPI(
     title="HandoverGuard Backend",
     description="AI-assisted medical handover organization tool (hackathon prototype).",
-    version="0.3.0",
+    version="0.4.0",
 )
 
 # Allow only the frontend dev origin (from settings/.env) — never a wildcard.
@@ -70,7 +70,7 @@ def health() -> dict[str, str]:
 def process_handover(request: HandoverRequest) -> HandoverResponse | JSONResponse:
     """Accept a transcript and return a structured handover draft.
 
-    Input validation is local; extraction is one Gemini call whose output is
+    Input validation is local; extraction is one Groq call whose output is
     re-validated against HandoverResponse. Failures return honest errors —
     never fabricated handover data and never the raw provider response.
     """
