@@ -69,7 +69,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
             <p className="text-sm font-medium text-[var(--text-primary)]">
               Drag & drop audio note, or <span className="text-[#00798c] dark:text-[#38bdf8] font-semibold underline">browse</span>
             </p>
-            <p className="text-xs text-[var(--text-muted)] mt-1">Supports dictation logs up to 50MB</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Supports audio files up to 25MB</p>
           </div>
         </div>
       ) : (

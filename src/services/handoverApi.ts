@@ -1,4 +1,4 @@
-import type { HandoverOutput, HandoverItem } from '../types/handover';
+﻿import type { HandoverOutput, HandoverItem } from '../types/handover';
 import { SAMPLE_HANDOVER_OUTPUT } from '../data/sampleData';
 
 /**
@@ -9,6 +9,53 @@ import { SAMPLE_HANDOVER_OUTPUT } from '../data/sampleData';
  */
 
 const PROCESS_URL = '/api/process-handover';
+const TRANSCRIBE_URL = '/api/transcribe';
+
+/**
+ * Upload audio to local Whisper STT. The returned transcript must be
+ * reviewed and edited by the clinician before generateHandover is called.
+ */
+export const transcribeAudio = async (audio: Blob | File): Promise<string> => {
+  const formData = new FormData();
+  const filename =
+    audio instanceof File
+      ? audio.name
+      : audio.type.includes('webm')
+        ? 'recording.webm'
+        : audio.type.includes('mp4')
+          ? 'recording.m4a'
+          : 'recording.wav';
+
+  formData.append('audio', audio, filename);
+
+  const response = await fetch(TRANSCRIBE_URL, {
+    method: 'POST',
+    body: formData
+  });
+
+  const body = await response.json().catch(() => null) as {
+    transcript?: unknown;
+    error?: { message?: string };
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(
+      body?.error?.message || `Transcription failed with status ${response.status}.`
+    );
+  }
+
+  if (typeof body?.transcript !== 'string') {
+    throw new Error('The transcription service returned an invalid response.');
+  }
+
+  if (!body.transcript.trim()) {
+    throw new Error(
+      'No speech was recognized. Please check the recording or enter the notes manually.'
+    );
+  }
+
+  return body.transcript;
+};
 
 /** Response shape returned by the backend (do not rename backend fields). */
 interface BackendHandover {
@@ -42,7 +89,7 @@ function mapBackendResponse(backend: BackendHandover, transcript: string): Hando
     id: `HO-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`,
     shift: 'Ward handover (AI-organised draft)',
     timestamp: now.toISOString(),
-    // UNIMPLEMENTED METRICS — the dashboard does not render `summary`; it only
+    // UNIMPLEMENTED METRICS â€” the dashboard does not render `summary`; it only
     // appears in the Export JSON file. Treat both values as "not assessed":
     // - patientCount: 1/0 indicates whether a patient reference was stated in
     //   the transcript, NOT a count of unique patients.
@@ -78,12 +125,12 @@ export const generateHandover = async (
     };
   }
 
-  // Speech-to-text (Person 2) is not integrated yet: audio alone cannot be
-  // processed, so require typed/pasted notes for real calls.
+  // Require reviewed typed/pasted notes; audio must be transcribed before
+  // calling this endpoint.
   const transcript = payload.rawText?.trim();
   if (!transcript) {
     throw new Error(
-      'Audio transcription is not integrated yet. Please type or paste the handover notes instead.'
+      'Please transcribe the audio first or enter the handover notes manually.'
     );
   }
 

@@ -7,7 +7,7 @@ import { HandoverDashboardCards } from './components/CategoryCard';
 import { LoadingState, ErrorState } from './components/StatusStates';
 import type { HandoverOutput } from './types/handover';
 import { SAMPLE_HANDOVER_OUTPUT } from './data/sampleData';
-import { generateHandover } from './services/handoverApi';
+import { generateHandover, transcribeAudio } from './services/handoverApi';
 import { 
   Sparkles, 
   FileText, 
@@ -47,6 +47,7 @@ export const App: React.FC = () => {
 
   // Processing & Output states
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [handoverResult, setHandoverResult] = useState<HandoverOutput | null>(null);
   const [copied, setCopied] = useState(false);
@@ -79,7 +80,32 @@ export const App: React.FC = () => {
     setManualNotes(SAMPLE_HANDOVER_OUTPUT.rawTranscript);
   };
 
-  // Submit trigger
+  // Explicitly transcribe selected audio; the clinician reviews the result before generation.
+  const handleTranscribeAudio = async () => {
+    const audio = uploadedFile ?? recordedBlob;
+
+    if (!audio) {
+      setErrorMessage('Record audio or select an audio file before transcribing.');
+      return;
+    }
+
+    setErrorMessage(null);
+    setIsTranscribing(true);
+
+    try {
+      const transcript = await transcribeAudio(audio);
+      setManualNotes(transcript);
+      setHandoverResult(null);
+    } catch (err: unknown) {
+      setErrorMessage(
+        err instanceof Error ? err.message : 'An unexpected error occurred during transcription.'
+      );
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
+  // Generate only from notes explicitly entered or reviewed by the clinician.
   const handleGenerateHandover = async (forceSimulateFailure = false) => {
     setErrorMessage(null);
     setIsProcessing(true);
@@ -90,16 +116,14 @@ export const App: React.FC = () => {
         throw new Error('Simulation test: Transcription service connection timed out or audio quality is too low.');
       }
 
-      if (!recordedBlob && !uploadedFile && manualNotes.trim().length === 0) {
-        setManualNotes(SAMPLE_HANDOVER_OUTPUT.rawTranscript);
+      const reviewedNotes = manualNotes.trim();
+      if (!reviewedNotes) {
+        throw new Error(
+          'Enter handover notes or transcribe audio first. Review the notes before generating a handover.'
+        );
       }
 
-      const result = await generateHandover({
-        audioBlob: recordedBlob || undefined,
-        audioFile: uploadedFile || undefined,
-        rawText: manualNotes || SAMPLE_HANDOVER_OUTPUT.rawTranscript
-      });
-
+      const result = await generateHandover({ rawText: reviewedNotes });
       setHandoverResult(result);
     } catch (err: unknown) {
       setErrorMessage(
@@ -186,14 +210,14 @@ export const App: React.FC = () => {
             <VoiceRecorder
               onAudioReady={handleAudioReady}
               onClearAudio={handleClearAudio}
-              disabled={isProcessing}
+              disabled={isProcessing || isTranscribing}
             />
 
             <FileUploader
               onFileSelected={handleFileSelected}
               selectedFile={uploadedFile}
               onClearFile={handleClearFile}
-              disabled={isProcessing}
+              disabled={isProcessing || isTranscribing}
             />
           </div>
 
@@ -202,8 +226,12 @@ export const App: React.FC = () => {
               value={manualNotes}
               onChange={setManualNotes}
               onLoadSample={handleLoadSampleNotes}
-              disabled={isProcessing}
+              disabled={isProcessing || isTranscribing}
             />
+            <p className="mt-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+              Clinical review required: transcription can contain errors. Verify names, medications,
+              doses, timings, and clinical details before generating or using a handover.
+            </p>
           </div>
 
           {/* Action Trigger Banner */}
@@ -211,17 +239,31 @@ export const App: React.FC = () => {
             <div className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#00798c] dark:bg-[#38bdf8]" />
               <span>
-                {hasAnyInput
-                  ? 'Ready to process clinical note with AI models.'
-                  : 'Click Generate to load sample handover or enter your notes above.'}
+                {isTranscribing
+                  ? 'Transcribing audio?'
+                  : manualNotes.trim()
+                    ? 'Notes are available. Review them before generating the handover.'
+                    : recordedBlob || uploadedFile
+                      ? 'Audio selected. Transcribe it, then review the transcript below.'
+                      : 'Enter notes manually or load the sample notes explicitly.'}
               </span>
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 type="button"
+                onClick={handleTranscribeAudio}
+                disabled={isProcessing || isTranscribing || !(recordedBlob || uploadedFile)}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-3 border border-[var(--border-card)] text-[var(--text-primary)] hover:bg-[var(--bg-main)] font-semibold text-sm rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <FileText className="w-4 h-4" />
+                <span>{isTranscribing ? 'Transcribing?' : 'Transcribe Audio'}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => handleGenerateHandover(false)}
-                disabled={isProcessing}
+                disabled={isProcessing || isTranscribing || !manualNotes.trim()}
                 className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-3 bg-[#00798c] hover:bg-[#006575] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#00798c]/25 transition-all focus:ring-4 focus:ring-[#00798c]/20 cursor-pointer disabled:opacity-50"
               >
                 <Sparkles className="w-4 h-4 text-[#edae49]" />
@@ -232,7 +274,7 @@ export const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleGenerateHandover(true)}
-                disabled={isProcessing}
+                disabled={isProcessing || isTranscribing}
                 title="Test how error states render for judges"
                 className="px-3 py-3 text-xs text-[var(--text-muted)] hover:text-[#d1495b] hover:bg-[#d1495b]/10 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-[#d1495b]/30"
               >
