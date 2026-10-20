@@ -37,6 +37,23 @@ MIN_RETRY_BUDGET_SECONDS = 2.0
 # The exact keys the model's JSON must contain — no extras, none missing.
 _EXPECTED_KEYS = set(HandoverResponse.model_fields.keys())
 
+# Sentinel markers delimiting the transcript in the prompt (see app/prompt.py).
+_TRANSCRIPT_BEGIN = "<<<TRANSCRIPT_BEGIN>>>"
+_TRANSCRIPT_END = "<<<TRANSCRIPT_END>>>"
+
+
+def _build_prompt(transcript: str) -> str:
+    """Wrap the transcript in sentinel markers.
+
+    Mechanical hardening, not just prompt wording: any marker-like text that
+    already exists inside the transcript is broken up so the transcript can
+    never fabricate or close the delimited data region itself. This reduces
+    injection surface; it cannot make injection impossible.
+    """
+    neutralised = transcript.replace(_TRANSCRIPT_BEGIN, "< transcript begin >")
+    neutralised = neutralised.replace(_TRANSCRIPT_END, "< transcript end >")
+    return PROMPT_PREFIX + neutralised + PROMPT_SUFFIX
+
 
 class LLMNotConfiguredError(Exception):
     """GROQ_API_KEY is missing from the backend configuration."""
@@ -99,11 +116,52 @@ def _extract(content: str | None) -> HandoverResponse:
         raise LLMInvalidResponseError("LLM JSON does not match the handover schema keys.")
 
     try:
-        return HandoverResponse.model_validate_json(content)
+        parsed = HandoverResponse.model_validate_json(content)
     except ValidationError as exc:
         raise LLMInvalidResponseError(
             "LLM returned JSON that does not match the handover schema."
         ) from exc
+    return _sanitise(parsed)
+
+
+def _sanitise(handover: HandoverResponse) -> HandoverResponse:
+    """De-noise validated model output without discarding clinical content.
+
+    - strips whitespace from every item and drops empty/whitespace-only items
+    - removes EXACT duplicates (same text after stripping) within a category
+      and across categories (first category wins) — similar-but-different
+      wording is always preserved, never merged
+    - normalises an empty/whitespace patient_reference to null
+    Bounds are checked AFTER this clean-up so harmless blank items cannot
+    cause rejection; genuine overruns raise llm_invalid_response instead of
+    being silently truncated.
+    """
+    patient_reference = (handover.patient_reference or "").strip() or None
+
+    cleaned: dict[str, list[str]] = {}
+    seen: set[str] = set()
+    total = 0
+    for field in ("completed", "pending", "follow_up", "communication", "unclear_or_undocumented"):
+        items: list[str] = []
+        for raw in getattr(handover, field):
+            item = raw.strip()
+            if not item or item in seen:
+                continue  # blank noise or an exact duplicate already captured
+            if len(item) > settings.max_output_item_chars:
+                raise LLMInvalidResponseError(
+                    "LLM returned an item exceeding the maximum item length."
+                )
+            seen.add(item)
+            items.append(item)
+        cleaned[field] = items
+        total += len(items)
+
+    if total > settings.max_output_items:
+        raise LLMInvalidResponseError(
+            "LLM returned more items than the configured maximum."
+        )
+
+    return HandoverResponse(patient_reference=patient_reference, **cleaned)
 
 
 def process_transcript_with_llm(transcript: str) -> HandoverResponse:
@@ -115,7 +173,7 @@ def process_transcript_with_llm(transcript: str) -> HandoverResponse:
     if not settings.groq_api_key:
         raise LLMNotConfiguredError("GROQ_API_KEY is not configured.")
 
-    prompt = PROMPT_PREFIX + transcript + PROMPT_SUFFIX
+    prompt = _build_prompt(transcript)
     deadline = time.monotonic() + settings.llm_timeout_seconds
     max_attempts = 2
 

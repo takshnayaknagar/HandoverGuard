@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # Shared across the initial attempt and the single allowed retry.
     llm_timeout_seconds: float = 30.0
 
+    # LLM output bounds (safety): out-of-bounds model output is rejected
+    # with llm_invalid_response (502), never silently truncated.
+    max_output_items: int = 100
+    max_output_item_chars: int = 500
+
     # Speech-to-text settings (local faster-whisper)
     stt_timeout_seconds: float = 180.0
     max_audio_mb: int = 25
