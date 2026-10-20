@@ -1,0 +1,7 @@
+{
+  "name": "HandoverGuard",
+  "description": "AI Shift Handover Assistant for clinical excellence with real-time voice notes, AI verification flags, and HIPAA-compliant shift reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
