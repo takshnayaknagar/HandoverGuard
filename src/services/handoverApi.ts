@@ -1,15 +1,16 @@
-﻿import type { HandoverOutput, HandoverItem } from '../types/handover';
+import type { HandoverOutput, HandoverItem } from '../types/handover';
 import { SAMPLE_HANDOVER_OUTPUT } from '../data/sampleData';
 
 /**
  * Handover API Service
- * Calls the FastAPI backend (Person 3): POST /process-handover.
+ * Calls the FastAPI backend: POST /process-handover, GET /handovers, GET /handovers/{case_id}.
  * The Vite dev server proxies /api -> http://127.0.0.1:8000, so no CORS
  * configuration is needed in development.
  */
 
 const PROCESS_URL = '/api/process-handover';
 const TRANSCRIBE_URL = '/api/transcribe';
+const HANDOVERS_URL = '/api/handovers';
 
 /**
  * Upload audio to local Whisper STT. The returned transcript must be
@@ -58,13 +59,21 @@ export const transcribeAudio = async (audio: Blob | File): Promise<string> => {
 };
 
 /** Response shape returned by the backend (do not rename backend fields). */
-interface BackendHandover {
+export interface BackendHandover {
+  case_id?: string;
   patient_reference: string | null;
   completed: string[];
   pending: string[];
   follow_up: string[];
   communication: string[];
   unclear_or_undocumented: string[];
+  created_at?: string;
+}
+
+export interface SavedHandoverSummary {
+  case_id: string;
+  patient_reference: string | null;
+  created_at: string;
 }
 
 export interface GenerateHandoverPayload {
@@ -82,19 +91,24 @@ function toItems(category: HandoverItem['category'], texts: string[], patient?: 
   }));
 }
 
-/** Map the backend's six-field contract onto the frontend's display model. */
-function mapBackendResponse(backend: BackendHandover, transcript: string): HandoverOutput {
+/** Map the backend's contract onto the frontend's display model. */
+export function mapBackendResponse(
+  backend: BackendHandover,
+  transcript: string,
+  extra?: { caseId?: string; createdAt?: string }
+): HandoverOutput {
   const now = new Date();
+  const caseId = extra?.caseId || backend.case_id;
+  const createdAt = extra?.createdAt || backend.created_at || now.toISOString();
+
   return {
-    id: `HO-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`,
+    id: caseId || `HO-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`,
     shift: 'Ward handover (AI-organised draft)',
-    timestamp: now.toISOString(),
-    // UNIMPLEMENTED METRICS â€” the dashboard does not render `summary`; it only
-    // appears in the Export JSON file. Treat both values as "not assessed":
-    // - patientCount: 1/0 indicates whether a patient reference was stated in
-    //   the transcript, NOT a count of unique patients.
-    // - criticalAlerts: always 0, which means "no critical-alert detection
-    //   exists", NEVER "no critical clinical issues".
+    timestamp: createdAt,
+    caseId: caseId,
+    patientReference: backend.patient_reference ?? null,
+    createdAt: createdAt,
+    // Metrics UNIMPLEMENTED in dashboard; kept for JSON schema compatibility
     summary: {
       patientCount: backend.patient_reference ? 1 : 0,
       criticalAlerts: 0,
@@ -153,5 +167,53 @@ export const generateHandover = async (
   }
 
   const backend = (await response.json()) as BackendHandover;
-  return mapBackendResponse(backend, transcript);
+
+  // Attempt to associate the newly generated SQLite case_id if available
+  let caseId: string | undefined;
+  let createdAt: string | undefined;
+  try {
+    const listRes = await fetch(HANDOVERS_URL);
+    if (listRes.ok) {
+      const list = (await listRes.json()) as SavedHandoverSummary[];
+      if (Array.isArray(list) && list.length > 0) {
+        caseId = list[0].case_id;
+        createdAt = list[0].created_at;
+      }
+    }
+  } catch {
+    // Continue gracefully if listing latest case is unavailable
+  }
+
+  return mapBackendResponse(backend, transcript, { caseId, createdAt });
+};
+
+/**
+ * Fetch all saved handover cases from the SQLite database.
+ */
+export const fetchSavedHandovers = async (): Promise<SavedHandoverSummary[]> => {
+  const response = await fetch(HANDOVERS_URL);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch saved handovers with status ${response.status}.`);
+  }
+  return response.json();
+};
+
+/**
+ * Fetch a specific saved handover case by its unique case_id.
+ */
+export const fetchSavedHandoverById = async (caseId: string): Promise<HandoverOutput> => {
+  const response = await fetch(`${HANDOVERS_URL}/${encodeURIComponent(caseId)}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch handover "${caseId}" with status ${response.status}.`);
+  }
+  const record = (await response.json()) as BackendHandover & {
+    case_id: string;
+    transcript: string;
+    created_at: string;
+  };
+
+  return mapBackendResponse(record, record.transcript || '', {
+    caseId: record.case_id,
+    createdAt: record.created_at
+  });
 };

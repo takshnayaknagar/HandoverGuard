@@ -20,6 +20,9 @@ export interface HandoverOutput {
   id: string;
   shift: string;
   timestamp: string;
+  caseId?: string;
+  patientReference?: string | null;
+  createdAt?: string;
   summary: HandoverSummary;
   items: {
     pending: HandoverItem[];

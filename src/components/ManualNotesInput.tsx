@@ -1,10 +1,11 @@
 import React from 'react';
-import { Edit3, Sparkles } from 'lucide-react';
+import { Edit3, Sparkles, Database } from 'lucide-react';
 
 interface ManualNotesInputProps {
   value: string;
   onChange: (val: string) => void;
   onLoadSample: () => void;
+  onViewSaved?: () => void;
   disabled?: boolean;
 }
 
@@ -12,24 +13,38 @@ export const ManualNotesInput: React.FC<ManualNotesInputProps> = ({
   value,
   onChange,
   onLoadSample,
+  onViewSaved,
   disabled = false
 }) => {
   return (
     <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-card)] p-6 shadow-sm transition-colors duration-200">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
           <Edit3 className="w-4 h-4 text-[#30638e] dark:text-[#38bdf8]" />
           <h3 className="font-semibold text-[var(--text-primary)] text-base">Manual Notes / Transcript Backup</h3>
         </div>
-        <button
-          type="button"
-          onClick={onLoadSample}
-          disabled={disabled}
-          className="text-xs font-semibold text-[#00798c] dark:text-[#38bdf8] bg-[#00798c]/10 hover:bg-[#00798c]/20 border border-[#00798c]/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-        >
-          <Sparkles className="w-3.5 h-3.5 text-[#edae49]" />
-          Load Hospital Sample Note
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={onLoadSample}
+            disabled={disabled}
+            className="text-xs font-semibold text-[#00798c] dark:text-[#38bdf8] bg-[#00798c]/10 hover:bg-[#00798c]/20 border border-[#00798c]/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-[#edae49]" />
+            Load Hospital Sample Note
+          </button>
+          {onViewSaved && (
+            <button
+              type="button"
+              onClick={onViewSaved}
+              disabled={disabled}
+              className="text-xs font-semibold text-[#30638e] dark:text-[#6ba1ce] bg-[#30638e]/10 hover:bg-[#30638e]/20 border border-[#30638e]/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Database className="w-3.5 h-3.5 text-[#30638e] dark:text-[#6ba1ce]" />
+              Saved Cases (SQLite)
+            </button>
+          )}
+        </div>
       </div>
 
       <p className="text-xs text-[var(--text-muted)] mb-3">

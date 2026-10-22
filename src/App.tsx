@@ -5,15 +5,24 @@ import { FileUploader } from './components/FileUploader';
 import { ManualNotesInput } from './components/ManualNotesInput';
 import { HandoverDashboardCards } from './components/CategoryCard';
 import { LoadingState, ErrorState } from './components/StatusStates';
+import { SavedHandoversModal } from './components/SavedHandoversModal';
 import type { HandoverOutput } from './types/handover';
 import { SAMPLE_HANDOVER_OUTPUT } from './data/sampleData';
-import { generateHandover, transcribeAudio } from './services/handoverApi';
+import { 
+  generateHandover, 
+  transcribeAudio, 
+  fetchSavedHandovers, 
+  fetchSavedHandoverById,
+  type SavedHandoverSummary 
+} from './services/handoverApi';
+import { exportHandoverToPdf } from './services/pdfExport';
 import { 
   Sparkles, 
   FileText, 
   CheckCircle, 
   Copy, 
   Download, 
+  FileDown,
   RotateCcw,
   ShieldCheck,
   Stethoscope
@@ -52,6 +61,16 @@ export const App: React.FC = () => {
   const [handoverResult, setHandoverResult] = useState<HandoverOutput | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // PDF Export states
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [pdfExported, setPdfExported] = useState(false);
+
+  // Saved Handovers states
+  const [isSavedModalOpen, setIsSavedModalOpen] = useState(false);
+  const [savedList, setSavedList] = useState<SavedHandoverSummary[]>([]);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [savedListError, setSavedListError] = useState<string | null>(null);
+
   // Audio recorder handlers
   const handleAudioReady = (blob: Blob, url: string) => {
     setRecordedBlob(blob);
@@ -78,6 +97,42 @@ export const App: React.FC = () => {
   // Sample quick-loader
   const handleLoadSampleNotes = () => {
     setManualNotes(SAMPLE_HANDOVER_OUTPUT.rawTranscript);
+  };
+
+  // Saved handovers handlers
+  const handleOpenSavedModal = async () => {
+    setIsSavedModalOpen(true);
+    setIsLoadingSaved(true);
+    setSavedListError(null);
+
+    try {
+      const list = await fetchSavedHandovers();
+      setSavedList(list);
+    } catch (err: unknown) {
+      setSavedListError(
+        err instanceof Error ? err.message : 'Could not fetch saved handovers from the database.'
+      );
+    } finally {
+      setIsLoadingSaved(false);
+    }
+  };
+
+  const handleLoadSavedCase = async (caseId: string) => {
+    setIsProcessing(true);
+    setIsSavedModalOpen(false);
+    setErrorMessage(null);
+
+    try {
+      const loaded = await fetchSavedHandoverById(caseId);
+      setHandoverResult(loaded);
+      setManualNotes(loaded.rawTranscript || '');
+    } catch (err: unknown) {
+      setErrorMessage(
+        err instanceof Error ? err.message : `Failed to load saved handover "${caseId}".`
+      );
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Explicitly transcribe selected audio; the clinician reviews the result before generation.
@@ -156,6 +211,24 @@ export const App: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleExportPdf = async () => {
+    if (!handoverResult) return;
+    setIsExportingPdf(true);
+    setErrorMessage(null);
+
+    try {
+      await exportHandoverToPdf(handoverResult);
+      setPdfExported(true);
+      setTimeout(() => setPdfExported(false), 2500);
+    } catch (err: unknown) {
+      setErrorMessage(
+        err instanceof Error ? `PDF Export failed: ${err.message}` : 'Failed to generate and download PDF.'
+      );
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const hasAnyInput = Boolean(recordedBlob || uploadedFile || manualNotes.trim().length > 0);
 
   return (
@@ -226,6 +299,7 @@ export const App: React.FC = () => {
               value={manualNotes}
               onChange={setManualNotes}
               onLoadSample={handleLoadSampleNotes}
+              onViewSaved={handleOpenSavedModal}
               disabled={isProcessing || isTranscribing}
             />
             <p className="mt-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
@@ -240,12 +314,12 @@ export const App: React.FC = () => {
               <span className="w-2 h-2 rounded-full bg-[#00798c] dark:bg-[#38bdf8]" />
               <span>
                 {isTranscribing
-                  ? 'Transcribing audio?'
+                  ? 'Transcribing audio...'
                   : manualNotes.trim()
                     ? 'Notes are available. Review them before generating the handover.'
                     : recordedBlob || uploadedFile
                       ? 'Audio selected. Transcribe it, then review the transcript below.'
-                      : 'Enter notes manually or load the sample notes explicitly.'}
+                      : 'Enter notes manually, load the sample notes, or select a saved case.'}
               </span>
             </div>
 
@@ -257,14 +331,14 @@ export const App: React.FC = () => {
                 className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-3 border border-[var(--border-card)] text-[var(--text-primary)] hover:bg-[var(--bg-main)] font-semibold text-sm rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FileText className="w-4 h-4" />
-                <span>{isTranscribing ? 'Transcribing?' : 'Transcribe Audio'}</span>
+                <span>{isTranscribing ? 'Transcribing...' : 'Transcribe Audio'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleGenerateHandover(false)}
                 disabled={isProcessing || isTranscribing || !manualNotes.trim()}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-3 bg-[#00798c] hover:bg-[#006575] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#00798c]/25 transition-all focus:ring-4 focus:ring-[#00798c]/20 cursor-pointer disabled:opacity-50"
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-3 bg-[#00798c] hover:bg-[#006575] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#00798c]/25 transition-all focus:ring-4 focus:ring-[#00798c]/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Sparkles className="w-4 h-4 text-[#edae49]" />
                 <span>Generate Handover</span>
@@ -305,11 +379,21 @@ export const App: React.FC = () => {
           <section className="animate-fade-in space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[var(--border-main)]">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-xl font-bold text-[var(--text-primary)]">2. Handover Dashboard</h2>
                   <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/30">
                     Analysis Completed
                   </span>
+                  {handoverResult.caseId && (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#00798c]/15 text-[#00798c] dark:text-[#38bdf8] font-mono font-medium border border-[#00798c]/30">
+                      Case: {handoverResult.caseId}
+                    </span>
+                  )}
+                  {handoverResult.patientReference && (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#30638e]/15 text-[#30638e] dark:text-[#93c5fd] font-medium border border-[#30638e]/30">
+                      Pt: {handoverResult.patientReference}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   Structured clinical categories ready for oncoming shift review
@@ -317,7 +401,7 @@ export const App: React.FC = () => {
               </div>
 
               {/* Dashboard Actions */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={handleCopySummary}
@@ -334,6 +418,18 @@ export const App: React.FC = () => {
                 >
                   <Download className="w-3.5 h-3.5 text-[#00798c] dark:text-[#38bdf8]" />
                   <span>Export JSON</span>
+                </button>
+
+                {/* Export PDF Button */}
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  disabled={!handoverResult || isExportingPdf}
+                  title={!handoverResult ? 'No handover available to export' : 'Export current handover as readable PDF'}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FileDown className="w-3.5 h-3.5 text-[#d1495b] dark:text-[#fda4af]" />
+                  <span>{isExportingPdf ? 'Exporting PDF...' : pdfExported ? 'PDF Downloaded!' : 'Export PDF'}</span>
                 </button>
 
                 <button
@@ -368,6 +464,16 @@ export const App: React.FC = () => {
           </section>
         )}
       </main>
+
+      {/* Saved Handovers Modal */}
+      <SavedHandoversModal
+        isOpen={isSavedModalOpen}
+        onClose={() => setIsSavedModalOpen(false)}
+        savedHandovers={savedList}
+        isLoading={isLoadingSaved}
+        errorMessage={savedListError}
+        onSelectCase={handleLoadSavedCase}
+      />
 
       {/* Footer */}
       <footer className="mt-auto border-t border-[var(--border-main)] bg-[var(--bg-card)] py-6 transition-colors duration-200">
