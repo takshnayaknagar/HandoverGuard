@@ -1,15 +1,18 @@
-"""Shared pytest fixtures: a test client for the FastAPI app.
 
-The LLM is never called in tests — Stage 1 only has /health, which is
-fully independent of any LLM configuration.
-"""
+"""Shared pytest fixtures for the FastAPI app."""
 
 import pytest
 from fastapi.testclient import TestClient
 
+import app.database as database
 from main import app
 
 
 @pytest.fixture()
-def client() -> TestClient:
-    return TestClient(app)
+def client(tmp_path, monkeypatch):
+    # Isolate each test's SQLite database from local demo data.
+    monkeypatch.setattr(database, "DATABASE_PATH", tmp_path / "handovers.db")
+
+    # Entering the context manager runs FastAPI startup and shutdown events.
+    with TestClient(app) as test_client:
+        yield test_client
