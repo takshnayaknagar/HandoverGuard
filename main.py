@@ -24,6 +24,7 @@ from app.database import (
     save_handover,
     list_handovers,
     get_handover,
+    delete_handover,
 )
 from app.schemas import HandoverRequest, HandoverResponse
 from app.stt_service import STTBusyError, STTModelError, STTTimeoutError
@@ -178,6 +179,19 @@ def get_saved_handover(case_id: str) -> dict | JSONResponse:
 
     return handover
 
+@app.delete("/handovers/{case_id}", response_model=None)
+def delete_saved_handover(case_id: str) -> dict | JSONResponse:
+    """Delete one saved handover using its unique case ID."""
+    deleted = delete_handover(case_id)
+
+    if not deleted:
+        return _error_response(
+            404,
+            "case_not_found",
+            "No saved handover was found for that case ID.",
+        )
+
+    return {"status": "ok", "case_id": case_id}
 
 # --- Speech-to-text -----------------------------------------------------------
 

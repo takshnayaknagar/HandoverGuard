@@ -8,12 +8,13 @@ import { LoadingState, ErrorState } from './components/StatusStates';
 import { SavedHandoversModal } from './components/SavedHandoversModal';
 import type { HandoverOutput } from './types/handover';
 import { SAMPLE_HANDOVER_OUTPUT } from './data/sampleData';
-import { 
-  generateHandover, 
-  transcribeAudio, 
-  fetchSavedHandovers, 
+import {
+  generateHandover,
+  transcribeAudio,
+  fetchSavedHandovers,
   fetchSavedHandoverById,
-  type SavedHandoverSummary 
+  deleteSavedHandover,
+  type SavedHandoverSummary
 } from './services/handoverApi';
 import { exportHandoverToPdf } from './services/pdfExport';
 import { 
@@ -116,6 +117,28 @@ export const App: React.FC = () => {
       setIsLoadingSaved(false);
     }
   };
+
+  const handleDeleteSavedCase = async (caseId: string) => {
+  const confirmed = window.confirm(
+    `Delete saved handover "${caseId}"? This action cannot be undone.`
+  );
+
+  if (!confirmed) return;
+
+  setSavedListError(null);
+
+  try {
+    await deleteSavedHandover(caseId);
+    const list = await fetchSavedHandovers();
+    setSavedList(list);
+  } catch (err: unknown) {
+    setSavedListError(
+      err instanceof Error
+        ? err.message
+        : 'Failed to delete the saved handover.'
+    );
+  }
+};
 
   const handleLoadSavedCase = async (caseId: string) => {
     setIsProcessing(true);
@@ -235,7 +258,7 @@ export const App: React.FC = () => {
     <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] flex flex-col font-sans transition-colors duration-200">
       <Header isDark={isDark} onToggleTheme={toggleTheme} />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 flex flex-col gap-6 sm:gap-8">
         {/* Hero Section */}
         <div className="bg-gradient-to-r from-[#003d5b] via-[#30638e] to-[#00798c] rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden border border-white/10">
           <div className="relative z-10 max-w-3xl">
@@ -473,6 +496,7 @@ export const App: React.FC = () => {
         isLoading={isLoadingSaved}
         errorMessage={savedListError}
         onSelectCase={handleLoadSavedCase}
+        onDeleteCase={handleDeleteSavedCase}
       />
 
       {/* Footer */}

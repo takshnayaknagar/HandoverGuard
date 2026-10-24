@@ -217,3 +217,24 @@ export const fetchSavedHandoverById = async (caseId: string): Promise<HandoverOu
     createdAt: record.created_at
   });
 };
+
+/**
+ * Delete one saved handover from the SQLite-backed API.
+ */
+export const deleteSavedHandover = async (caseId: string): Promise<void> => {
+  const response = await fetch(
+    `${HANDOVERS_URL}/${encodeURIComponent(caseId)}`,
+    { method: 'DELETE' }
+  );
+
+  const body = await response.json().catch(() => null) as {
+    error?: { message?: string };
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(
+      body?.error?.message ||
+      `Failed to delete handover with status ${response.status}.`
+    );
+  }
+};

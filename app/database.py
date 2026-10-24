@@ -105,3 +105,16 @@ def get_handover(case_id: str) -> dict | None:
         result[field] = json.loads(result[field])
 
     return result
+
+def delete_handover(case_id: str) -> bool:
+    """Delete a saved handover by case ID.
+
+    Returns True if a handover was deleted, otherwise False.
+    """
+    with get_connection() as connection:
+        cursor = connection.execute(
+            "DELETE FROM handovers WHERE case_id = ?",
+            (case_id,),
+        )
+
+    return cursor.rowcount > 0

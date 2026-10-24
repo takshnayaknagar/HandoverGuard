@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, X, Clock, User, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { Database, X, Clock, User, ArrowRight, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import type { SavedHandoverSummary } from '../services/handoverApi';
 
 interface SavedHandoversModalProps {
@@ -9,6 +9,7 @@ interface SavedHandoversModalProps {
   isLoading: boolean;
   errorMessage: string | null;
   onSelectCase: (caseId: string) => void;
+  onDeleteCase: (caseId: string) => void;
 }
 
 export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
@@ -17,7 +18,8 @@ export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
   savedHandovers,
   isLoading,
   errorMessage,
-  onSelectCase
+  onSelectCase,
+  onDeleteCase
 }) => {
   if (!isOpen) return null;
 
@@ -117,6 +119,14 @@ export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
                 >
                   <span>Load Case</span>
                   <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeleteCase(item.case_id)}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0 ml-2"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete</span>
                 </button>
               </div>
             ))
