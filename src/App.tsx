@@ -71,6 +71,9 @@ export const App: React.FC = () => {
   const [savedList, setSavedList] = useState<SavedHandoverSummary[]>([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
   const [savedListError, setSavedListError] = useState<string | null>(null);
+  // Export PDF state for individual saved handovers
+  const [exportingCaseId, setExportingCaseId] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Audio recorder handlers
   const handleAudioReady = (blob: Blob, url: string) => {
@@ -155,6 +158,22 @@ export const App: React.FC = () => {
       );
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // Export PDF for a saved handover case
+  const handleExportSavedCase = async (caseId: string) => {
+    setExportError(null);
+    setExportingCaseId(caseId);
+    try {
+      const handover = await fetchSavedHandoverById(caseId);
+      await exportHandoverToPdf(handover);
+    } catch (err: unknown) {
+      setExportError(
+        err instanceof Error ? err.message : 'Failed to export saved handover as PDF.'
+      );
+    } finally {
+      setExportingCaseId(null);
     }
   };
 
@@ -497,6 +516,9 @@ export const App: React.FC = () => {
         errorMessage={savedListError}
         onSelectCase={handleLoadSavedCase}
         onDeleteCase={handleDeleteSavedCase}
+        onExportCase={handleExportSavedCase}
+        exportingCaseId={exportingCaseId}
+        exportError={exportError}
       />
 
       {/* Footer */}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, X, Clock, User, ArrowRight, Loader2, AlertCircle, Trash2 } from 'lucide-react';
+import { Database, X, Clock, User, ArrowRight, Loader2, AlertCircle, Trash2, FileDown } from 'lucide-react';
 import type { SavedHandoverSummary } from '../services/handoverApi';
 
 interface SavedHandoversModalProps {
@@ -10,6 +10,9 @@ interface SavedHandoversModalProps {
   errorMessage: string | null;
   onSelectCase: (caseId: string) => void;
   onDeleteCase: (caseId: string) => void;
+  onExportCase: (caseId: string) => Promise<void>;
+  exportingCaseId: string | null;
+  exportError: string | null;
 }
 
 export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
@@ -19,7 +22,10 @@ export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
   isLoading,
   errorMessage,
   onSelectCase,
-  onDeleteCase
+  onDeleteCase,
+  onExportCase,
+  exportingCaseId,
+  exportError
 }) => {
   if (!isOpen) return null;
 
@@ -67,6 +73,16 @@ export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto flex-1 space-y-3">
+                    {exportError && (
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+              <div className="text-xs">
+                <p className="font-semibold mb-1">PDF export failed</p>
+                <p>{exportError}</p>
+              </div>
+            </div>
+          )}
+
           {isLoading ? (
             <div className="py-12 flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
               <Loader2 className="w-7 h-7 text-[#00798c] dark:text-[#38bdf8] animate-spin" />
@@ -119,6 +135,17 @@ export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
                 >
                   <span>Load Case</span>
                   <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onExportCase(item.case_id)}
+                  disabled={exportingCaseId === item.case_id}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#38bdf8] hover:bg-[#2c9abf] rounded-lg shadow-xs transition-colors cursor-pointer shrink-0 ml-2"
+                >
+                  <FileDown className="w-3.5 h-3.5" />
+                  <span>
+                    {exportingCaseId === item.case_id ? 'Exporting...' : 'Export PDF'}
+                  </span>
                 </button>
                 <button
                   type="button"
