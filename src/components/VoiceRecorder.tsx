@@ -162,8 +162,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               type="button"
               onClick={stopRecording}
               aria-label="Stop voice recording"
-              className="min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-6 py-3.5 font-medium text-white transition-colors hover:bg-[#292929] sm:w-auto sm:min-w-56 cursor-pointer animate-pulse touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
-            >
+              className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-4 py-3.5 text-center font-medium text-white transition-colors hover:bg-[#292929] sm:w-auto sm:min-w-56 cursor-pointer animate-pulse touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"            >
               <Square className="w-5 h-5 text-[#edae49] fill-[#edae49]" />
               <span>Stop Recording ({formatTime(recordingDuration)})</span>
             </button>
