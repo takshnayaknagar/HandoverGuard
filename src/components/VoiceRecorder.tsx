@@ -123,41 +123,46 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   }, [audioUrl]);
 
   return (
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-card)] p-6 shadow-sm transition-colors duration-200">
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] p-4 transition-colors duration-200 sm:p-5">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-[#d1495b] animate-ping' : audioUrl ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+          <div className={`h-2.5 w-2.5 rounded-full ${isRecording ? 'bg-[#b54747] animate-ping' : audioUrl ? 'bg-emerald-500' : 'bg-[var(--border-card)]'}`} />
           <h3 className="font-semibold text-[var(--text-primary)] text-base">Direct Voice Recording</h3>
         </div>
-        <span className="text-xs font-mono font-medium px-2.5 py-1 rounded-md bg-[var(--bg-card-muted)] text-[var(--text-secondary)]">
+        <span className="self-end sm:self-auto text-xs font-mono font-medium px-2.5 py-1 rounded-md bg-[var(--bg-card-muted)] text-[var(--text-secondary)]" aria-label="Recording duration">
           {isRecording ? formatTime(recordingDuration) : audioUrl ? formatTime(audioDuration || recordingDuration) : '00:00'}
         </span>
       </div>
 
       {micError && (
-        <div className="mb-4 p-3 bg-[#d1495b]/10 border border-[#d1495b]/30 rounded-xl text-xs text-[#d1495b]">
+        <div role="alert" className="mb-4 p-3 bg-[#d1495b]/10 border border-[#d1495b]/30 rounded-xl text-xs text-[#d1495b]">
           {micError}
         </div>
       )}
 
       {/* Recording Actions */}
-      <div className="flex flex-col sm:flex-row items-center gap-4">
+      <div className="relative flex flex-col items-center gap-4 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)]/45 p-4 sm:p-5">
+        <div className="text-center text-xs font-medium text-[var(--text-secondary)]">
+          {isRecording ? 'Recording live audio from this browser' : audioUrl ? 'Recording ready for review or transcription' : 'Start a recording when you are ready'}
+        </div>
         {!audioUrl ? (
           !isRecording ? (
             <button
               type="button"
               onClick={startRecording}
               disabled={disabled}
-              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 px-6 py-3.5 bg-[#d1495b] hover:bg-[#b83b4b] disabled:opacity-50 text-white font-medium rounded-xl shadow-sm transition-all focus:ring-4 focus:ring-[#d1495b]/20 cursor-pointer"
+              aria-label="Start voice recording"
+              className="flex h-28 w-28 flex-col items-center justify-center gap-2 rounded-full bg-[#DC3535] px-3 py-3.5 font-medium text-white transition-colors hover:bg-[#B82B2B] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
             >
-              <Mic className="w-5 h-5 text-white" />
-              <span>Start Recording</span>
+              <Mic className="h-8 w-8 text-white" />
+              <span className="text-xs font-bold tracking-[0.16em]">RECORD</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={stopRecording}
-              className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 px-6 py-3.5 bg-[#003d5b] hover:bg-[#002b40] text-white font-medium rounded-xl shadow-sm transition-all focus:ring-4 focus:ring-[#003d5b]/30 cursor-pointer animate-pulse"
+              aria-label="Stop voice recording"
+              className="min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-6 py-3.5 font-medium text-white transition-colors hover:bg-[#292929] sm:w-auto sm:min-w-56 cursor-pointer animate-pulse touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
             >
               <Square className="w-5 h-5 text-[#edae49] fill-[#edae49]" />
               <span>Stop Recording ({formatTime(recordingDuration)})</span>
@@ -170,7 +175,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               <button
                 type="button"
                 onClick={togglePlayback}
-                className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#00798c] hover:bg-[#006575] text-white cursor-pointer transition-colors shadow-sm"
+                aria-label={isPlaying ? 'Pause recorded audio' : 'Play recorded audio'}
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#315f9f] text-white transition-colors hover:bg-[#244a80] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
               >
                 {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
               </button>
@@ -196,7 +202,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               <button
                 type="button"
                 onClick={resetRecording}
-                className="p-2 text-[var(--text-muted)] hover:text-[#d1495b] hover:bg-[#d1495b]/10 rounded-lg transition-colors cursor-pointer"
+                aria-label="Discard recording and record again"
+                className="p-2 min-h-10 min-w-10 flex items-center justify-center text-[var(--text-muted)] hover:text-[#d1495b] hover:bg-[#d1495b]/10 rounded-lg transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d1495b]"
                 title="Discard & Re-record"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -218,7 +225,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         )}
       </div>
 
-      <div className="mt-3 flex items-center justify-between text-xs text-[var(--text-muted)]">
+      <div className="mt-3 flex flex-col items-start gap-2 text-xs text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between">
         <span>High-fidelity browser audio capture</span>
         {isRecording && <span className="text-[#d1495b] font-semibold animate-pulse">● Live Recording</span>}
       </div>

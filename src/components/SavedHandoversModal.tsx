@@ -13,6 +13,7 @@ interface SavedHandoversModalProps {
   onExportCase: (caseId: string) => Promise<void>;
   exportingCaseId: string | null;
   exportError: string | null;
+  presentation?: 'modal' | 'screen';
 }
 
 export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
@@ -25,9 +26,10 @@ export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
   onDeleteCase,
   onExportCase,
   exportingCaseId,
-  exportError
+  exportError,
+  presentation = 'modal'
 }) => {
-  if (!isOpen) return null;
+  if (!isOpen && presentation === 'modal') return null;
 
   const formatDate = (isoString: string) => {
     try {
@@ -44,27 +46,28 @@ export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fade-in">
-      <div className="bg-[var(--bg-card)] border border-[var(--border-main)] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
+    <div className={presentation === 'screen' ? 'w-full' : 'fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 backdrop-blur-xs animate-fade-in sm:items-center sm:p-4'} role={presentation === 'modal' ? 'dialog' : undefined} aria-modal={presentation === 'modal' ? true : undefined} aria-labelledby="saved-handovers-title">
+      <div className={presentation === 'screen' ? 'mx-auto flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)]' : 'flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border border-[var(--border-main)] bg-[var(--bg-card)] shadow-2xl sm:max-h-[85vh] sm:rounded-2xl'}>
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-[var(--border-main)] flex items-center justify-between bg-[var(--bg-card-muted)]">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-[#00798c]/15 text-[#00798c] dark:text-[#38bdf8]">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--border-main)] px-4 py-4 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] p-2 text-[#315f9f] dark:text-[#8AB4FF]">
               <Database className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="font-bold text-base text-[var(--text-primary)]">
+            <div className="min-w-0">
+              <h3 id="saved-handovers-title" className="font-bold text-base text-[var(--text-primary)]">
                 Saved Handover Cases
               </h3>
-              <p className="text-xs text-[var(--text-muted)]">
-                Retrieved from SQLite database (<code className="font-mono text-[11px]">data/handovers.db</code>)
+              <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+                Retrieved from the SQLite database
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-main)] transition-colors cursor-pointer"
+            aria-label={presentation === 'screen' ? 'Return to input' : 'Close saved handovers'}
+            className="min-h-10 min-w-10 flex shrink-0 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-card-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
             title="Close modal"
           >
             <X className="w-5 h-5" />
@@ -72,9 +75,9 @@ export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-3">
-                    {exportError && (
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex items-start gap-3">
+        <div className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-6">
+          {exportError && (
+            <div role="alert" className="flex items-start gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4 text-amber-700 dark:text-amber-400">
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
               <div className="text-xs">
                 <p className="font-semibold mb-1">PDF export failed</p>
@@ -84,12 +87,12 @@ export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
           )}
 
           {isLoading ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
-              <Loader2 className="w-7 h-7 text-[#00798c] dark:text-[#38bdf8] animate-spin" />
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[var(--border-main)] bg-[var(--bg-card-muted)] py-12 text-center text-[var(--text-muted)]">
+              <Loader2 className="w-7 h-7 text-[#315f9f] dark:text-[#8AB4FF] animate-spin" />
               <span className="text-sm">Fetching saved handovers from SQLite...</span>
             </div>
           ) : errorMessage ? (
-            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-400 flex items-start gap-3">
+            <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 p-4 text-rose-700 dark:text-rose-400">
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
               <div className="text-xs">
                 <p className="font-semibold mb-1">Failed to load saved handovers</p>
@@ -97,24 +100,24 @@ export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
               </div>
             </div>
           ) : savedHandovers.length === 0 ? (
-            <div className="py-12 text-center text-[var(--text-muted)] text-sm italic">
-              No saved handovers found in the database. Process a handover to save it automatically.
+            <div className="rounded-2xl border border-dashed border-[var(--border-main)] bg-[var(--bg-card-muted)] px-5 py-12 text-center text-sm italic text-[var(--text-muted)]">
+              No saved handovers found. Process a handover to save it automatically.
             </div>
           ) : (
             savedHandovers.map((item) => (
               <div
                 key={item.case_id}
-                className="p-4 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] hover:border-[#00798c]/50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                className="group flex flex-col gap-4 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 transition-colors hover:border-[#315f9f]/50 sm:p-5"
               >
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-mono font-bold text-[var(--text-primary)] bg-[var(--bg-card-muted)] px-2 py-0.5 rounded border border-[var(--border-main)]">
+                    <span className="max-w-full break-all rounded border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-2 py-1 text-xs font-mono font-bold text-[var(--text-primary)]">
                       {item.case_id}
                     </span>
                     {item.patient_reference ? (
-                      <span className="text-xs font-medium text-[#00798c] dark:text-[#38bdf8] bg-[#00798c]/10 px-2 py-0.5 rounded-full flex items-center gap-1 border border-[#00798c]/20">
-                        <User className="w-3 h-3" />
-                        {item.patient_reference}
+                      <span className="flex items-center gap-1 rounded-full border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
+                        <User className="h-3 w-3 shrink-0" />
+                        <span className="break-words">{item.patient_reference}</span>
                       </span>
                     ) : (
                       <span className="text-[11px] text-[var(--text-muted)] italic">
@@ -128,45 +131,45 @@ export const SavedHandoversModal: React.FC<SavedHandoversModalProps> = ({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onSelectCase(item.case_id)}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#00798c] hover:bg-[#006575] rounded-lg shadow-xs transition-colors cursor-pointer shrink-0"
-                >
-                  <span>Load Case</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onExportCase(item.case_id)}
-                  disabled={exportingCaseId === item.case_id}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#38bdf8] hover:bg-[#2c9abf] rounded-lg shadow-xs transition-colors cursor-pointer shrink-0 ml-2"
-                >
-                  <FileDown className="w-3.5 h-3.5" />
-                  <span>
-                    {exportingCaseId === item.case_id ? 'Exporting...' : 'Export PDF'}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDeleteCase(item.case_id)}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-xs transition-colors cursor-pointer shrink-0 ml-2"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete</span>
-                </button>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => onSelectCase(item.case_id)}
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-[#315f9f] px-3 py-2 text-xs font-semibold text-white transition-colors cursor-pointer hover:bg-[#244a80] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+                  >
+                    <span>Load Case</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onExportCase(item.case_id)}
+                    disabled={exportingCaseId === item.case_id}
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors cursor-pointer hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    <span>{exportingCaseId === item.case_id ? 'Exporting...' : 'Export PDF'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteCase(item.case_id)}
+                    className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-700 transition-colors cursor-pointer hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 dark:text-rose-300"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete</span>
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3 border-t border-[var(--border-main)] bg-[var(--bg-card-muted)] flex items-center justify-between text-xs text-[var(--text-muted)]">
+        <div className="flex items-center justify-between gap-3 border-t border-[var(--border-main)] px-4 py-3 text-xs text-[var(--text-muted)] sm:px-6">
           <span>{savedHandovers.length} saved case(s)</span>
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card)] rounded-lg transition-colors cursor-pointer border border-[var(--border-main)]"
+            className="min-h-10 rounded-lg border border-[var(--border-main)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-muted)] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
           >
             Close
           </button>

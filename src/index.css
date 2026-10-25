@@ -1,45 +1,74 @@
 @import "tailwindcss";
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   :root {
-    /* Brand custom palette */
-    --color-gold: #edae49;
-    --color-coral: #d1495b;
-    --color-teal: #00798c;
-    --color-blue: #30638e;
-    --color-navy: #003d5b;
+    /* Minimal neutral product palette */
+    --color-accent: #315f9f;
+    --color-accent-strong: #244a80;
+    --color-gold: #a66a00;
+    --color-coral: #b54747;
+    --color-teal: #315f9f;
+    --color-blue: #315f9f;
+    --color-navy: #111111;
 
     /* Theme tokens - Light mode default */
-    --bg-main: #f8fafc;
+    --bg-main: #f6f6f4;
     --bg-card: #ffffff;
-    --bg-card-muted: #f1f5f9;
-    --bg-input: #f8fafc;
-    --border-main: #e2e8f0;
-    --border-card: #e2e8f0;
-    --text-primary: #003d5b;
-    --text-secondary: #475569;
-    --text-muted: #64748b;
-    --nav-bg: rgba(255, 255, 255, 0.85);
+    --bg-card-muted: #f0f0ed;
+    --bg-input: #fbfbfa;
+    --border-main: #deded9;
+    --border-card: #d4d4cf;
+    --text-primary: #111111;
+    --text-secondary: #555555;
+    --text-muted: #777777;
+    --nav-bg: rgba(255, 255, 255, 0.92);
   }
 
   .dark {
     /* Theme tokens - Dark mode */
-    --bg-main: #021a27;
-    --bg-card: #002b40;
-    --bg-card-muted: #003852;
-    --bg-input: #002233;
-    --border-main: #004d73;
-    --border-card: #004566;
-    --text-primary: #f8fafc;
-    --text-secondary: #cbd5e1;
-    --text-muted: #94a3b8;
-    --nav-bg: rgba(0, 43, 64, 0.88);
+    --bg-main: #050505;
+    --bg-card: #111111;
+    --bg-card-muted: #171717;
+    --bg-input: #0d0d0d;
+    --border-main: #292929;
+    --border-card: #333333;
+    --text-primary: #f5f5f5;
+    --text-secondary: #b3b3b3;
+    --text-muted: #777777;
+    --nav-bg: rgba(5, 5, 5, 0.94);
   }
 
   body {
     background-color: var(--bg-main);
     color: var(--text-primary);
+    min-width: 320px;
+    min-height: 100vh;
+    overscroll-behavior-x: none;
     @apply antialiased font-sans transition-colors duration-200;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid #8ab4ff;
+    outline-offset: 2px;
+  }
+
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+  }
+
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top, 0px), 8px);
   }
 }
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
+import { MobileNav } from './components/MobileNav';
 import { VoiceRecorder } from './components/VoiceRecorder';
 import { FileUploader } from './components/FileUploader';
 import { ManualNotesInput } from './components/ManualNotesInput';
@@ -20,16 +21,17 @@ import { exportHandoverToPdf } from './services/pdfExport';
 import { 
   Sparkles, 
   FileText, 
-  CheckCircle, 
   Copy, 
   Download, 
   FileDown,
   RotateCcw,
-  ShieldCheck,
-  Stethoscope
+  Stethoscope,
+  Database,
+  LogIn
 } from 'lucide-react';
 
 export const App: React.FC = () => {
+  const [activeScreen, setActiveScreen] = useState<'login' | 'input' | 'dashboard' | 'export' | 'saved'>('input');
   // Theme state: default to dark if preferred or stored in localStorage
   const [isDark, setIsDark] = useState<boolean>(() => {
     const saved = localStorage.getItem('handoverguard-theme');
@@ -105,6 +107,7 @@ export const App: React.FC = () => {
 
   // Saved handovers handlers
   const handleOpenSavedModal = async () => {
+    setActiveScreen('saved');
     setIsSavedModalOpen(true);
     setIsLoadingSaved(true);
     setSavedListError(null);
@@ -152,6 +155,7 @@ export const App: React.FC = () => {
       const loaded = await fetchSavedHandoverById(caseId);
       setHandoverResult(loaded);
       setManualNotes(loaded.rawTranscript || '');
+      setActiveScreen('dashboard');
     } catch (err: unknown) {
       setErrorMessage(
         err instanceof Error ? err.message : `Failed to load saved handover "${caseId}".`
@@ -203,16 +207,11 @@ export const App: React.FC = () => {
   };
 
   // Generate only from notes explicitly entered or reviewed by the clinician.
-  const handleGenerateHandover = async (forceSimulateFailure = false) => {
+  const handleGenerateHandover = async () => {
     setErrorMessage(null);
     setIsProcessing(true);
 
     try {
-      if (forceSimulateFailure) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        throw new Error('Simulation test: Transcription service connection timed out or audio quality is too low.');
-      }
-
       const reviewedNotes = manualNotes.trim();
       if (!reviewedNotes) {
         throw new Error(
@@ -222,6 +221,7 @@ export const App: React.FC = () => {
 
       const result = await generateHandover({ rawText: reviewedNotes });
       setHandoverResult(result);
+      setActiveScreen('dashboard');
     } catch (err: unknown) {
       setErrorMessage(
         err instanceof Error ? err.message : 'An unexpected error occurred while parsing handover.'
@@ -233,7 +233,7 @@ export const App: React.FC = () => {
 
   const handleCopySummary = () => {
     if (!handoverResult) return;
-    const textToCopy = `Shift Handover: ${handoverResult.shift}\nTime: ${handoverResult.timestamp}\n\nPENDING:\n${handoverResult.items.pending.map((i) => `• ${i.title} (${i.patient || 'General'})`).join('\n')}\n\nFOLLOW-UP:\n${handoverResult.items.followup.map((i) => `• ${i.title} (${i.patient || 'General'})`).join('\n')}\n\nCOMPLETED:\n${handoverResult.items.completed.map((i) => `• ${i.title}`).join('\n')}\n\nCOMMUNICATION:\n${handoverResult.items.communication.map((i) => `• ${i.title}`).join('\n')}\n\nNEEDS VERIFICATION:\n${handoverResult.items.verification.map((i) => `• ${i.title}`).join('\n')}`;
+    const textToCopy = `Shift Handover: ${handoverResult.shift}\nTime: ${handoverResult.timestamp}\n\nPENDING:\n${handoverResult.items.pending.map((i) => `- ${i.title} (${i.patient || 'General'})`).join('\n')}\n\nFOLLOW-UP:\n${handoverResult.items.followup.map((i) => `- ${i.title} (${i.patient || 'General'})`).join('\n')}\n\nCOMPLETED:\n${handoverResult.items.completed.map((i) => `- ${i.title}`).join('\n')}\n\nCOMMUNICATION:\n${handoverResult.items.communication.map((i) => `- ${i.title}`).join('\n')}\n\nNEEDS VERIFICATION:\n${handoverResult.items.verification.map((i) => `- ${i.title}`).join('\n')}`;
 
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
@@ -274,54 +274,57 @@ export const App: React.FC = () => {
   const hasAnyInput = Boolean(recordedBlob || uploadedFile || manualNotes.trim().length > 0);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] flex flex-col font-sans transition-colors duration-200">
-      <Header isDark={isDark} onToggleTheme={toggleTheme} />
+    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] flex justify-center font-sans transition-colors duration-200">
+      <div className="relative flex min-h-screen w-full max-w-[440px] flex-col overflow-hidden border-[var(--border-main)] bg-[var(--bg-main)] shadow-2xl sm:my-3 sm:min-h-[calc(100vh-24px)] sm:rounded-[28px] sm:border lg:my-0 lg:max-w-[1440px] lg:rounded-none lg:border-0 lg:shadow-none">
+      <Header
+        isDark={isDark}
+        onToggleTheme={toggleTheme}
+        title={activeScreen === 'login' ? 'Login' : activeScreen === 'input' ? 'Voice Note' : activeScreen === 'dashboard' ? 'Dashboard' : activeScreen === 'export' ? 'Export' : 'Saved Handovers'}
+      />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 flex flex-col gap-6 sm:gap-8">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-r from-[#003d5b] via-[#30638e] to-[#00798c] rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden border border-white/10">
-          <div className="relative z-10 max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 text-[#edae49] text-xs font-semibold mb-4 border border-[#edae49]/30 backdrop-blur-xs">
-              <Stethoscope className="w-3.5 h-3.5 text-[#edae49]" />
-              <span>Next-Gen Clinical Communication</span>
+      <main className="flex-1 w-full mx-auto px-4 pb-28 pt-4 sm:px-6 sm:py-8 lg:px-12 flex flex-col gap-5 sm:gap-8">
+        {activeScreen === 'login' && (
+          <section className="mx-auto flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-8 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] text-[var(--text-secondary)]">
+              <LogIn className="h-5 w-5" />
             </div>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white mb-4">
-              Handover<span className="text-[#edae49]">Guard</span>
-            </h1>
-            <p className="text-slate-100/90 text-base sm:text-lg leading-relaxed mb-6">
-              Empowering healthcare teams with AI-assisted clinical shift handovers. Record or upload voice dictations, transcribe, and automatically categorize critical patient updates into structured action cards.
-            </p>
-            <div className="flex flex-wrap gap-4 text-xs font-medium text-slate-100">
-              <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-xs border border-white/10">
-                <CheckCircle className="w-4 h-4 text-[#edae49]" /> 5-Category SBAR Structure
-              </span>
-              <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-xs border border-white/10">
-                <ShieldCheck className="w-4 h-4 text-[#edae49]" /> Verification Safety Guard
-              </span>
-              <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-xs border border-white/10">
-                <FileText className="w-4 h-4 text-[#edae49]" /> Zero-Loss Dictation
-              </span>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Login is not available yet</h2>
+            <p className="max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">Authentication has not been implemented. You can continue using the Voice Note, Dashboard, and Export areas without signing in.</p>
+            <button type="button" onClick={() => setActiveScreen('input')} className="min-h-11 rounded-xl bg-[#315f9f] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#244a80] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">Open Voice Note</button>
+          </section>
+        )}
+
+        {activeScreen === 'input' && <div className="mx-auto flex w-full max-w-md items-center justify-between rounded-xl border border-[#eceef0] bg-[var(--bg-card-muted)] p-3 shadow-sm dark:border-[var(--border-main)]">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eceef0] text-[#191c1e] dark:bg-[var(--bg-card)] dark:text-[var(--text-primary)]">
+              <Stethoscope className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-[var(--text-secondary)]">Active handover note</div>
+              <div className="truncate text-base font-semibold text-[var(--text-primary)]">Voice Note</div>
             </div>
           </div>
-        </div>
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#86f2e4] px-3 py-1 text-xs font-semibold text-[#006f66]">
+            <span className="h-2 w-2 rounded-full bg-[#006a61]" /> Ready
+          </span>
+        </div>}
 
-        {/* Section 1 & 2: Input Controls */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
+        {activeScreen === 'input' && <section className="mx-auto flex w-full max-w-md flex-col scroll-mt-24 pb-8">
+          <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
             <div>
-              <h2 className="text-xl font-bold text-[var(--text-primary)]">1. Dictation & Input Center</h2>
-              <p className="text-xs text-[var(--text-muted)]">
-                Choose a method: record live audio, upload an audio file, or enter manual notes
+              <h2 className="text-base font-bold text-[var(--text-primary)]">Record a handover note</h2>
+              <p className="text-xs leading-relaxed text-[var(--text-muted)]">
+                Record audio or upload a note, then review the transcript before processing.
               </p>
             </div>
             {hasAnyInput && (
-              <span className="text-xs font-semibold text-[#00798c] dark:text-[#38bdf8] bg-[#00798c]/10 border border-[#00798c]/30 px-2.5 py-1 rounded-lg">
+              <span className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-2.5 py-1 text-xs font-semibold text-[#315f9f] dark:text-[#8AB4FF]">
                 Input Selected
               </span>
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="flex flex-col gap-4">
             <VoiceRecorder
               onAudioReady={handleAudioReady}
               onClearAudio={handleClearAudio}
@@ -336,7 +339,7 @@ export const App: React.FC = () => {
             />
           </div>
 
-          <div className="mt-6">
+          <div className="mt-4 flex flex-col gap-4">
             <ManualNotesInput
               value={manualNotes}
               onChange={setManualNotes}
@@ -350,10 +353,10 @@ export const App: React.FC = () => {
             </p>
           </div>
 
-          {/* Action Trigger Banner */}
-          <div className="mt-6 p-4 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-card)] shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 transition-colors duration-200">
+          {/* Source-style primary action footer, backed by the real target handlers. */}
+          <div className="sticky bottom-20 z-20 mt-2 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)]/95 p-3 shadow-lg backdrop-blur-md">
             <div className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#00798c] dark:bg-[#38bdf8]" />
+              <span className="h-2 w-2 rounded-full bg-[#315f9f] dark:bg-[#8AB4FF]" />
               <span>
                 {isTranscribing
                   ? 'Transcribing audio...'
@@ -365,12 +368,12 @@ export const App: React.FC = () => {
               </span>
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="mt-3 flex w-full flex-col gap-2 sm:flex-row">
               <button
                 type="button"
                 onClick={handleTranscribeAudio}
                 disabled={isProcessing || isTranscribing || !(recordedBlob || uploadedFile)}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-3 border border-[var(--border-card)] text-[var(--text-primary)] hover:bg-[var(--bg-main)] font-semibold text-sm rounded-xl transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--border-card)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition-all hover:bg-[var(--bg-main)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <FileText className="w-4 h-4" />
                 <span>{isTranscribing ? 'Transcribing...' : 'Transcribe Audio'}</span>
@@ -378,61 +381,68 @@ export const App: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => handleGenerateHandover(false)}
+                onClick={handleGenerateHandover}
                 disabled={isProcessing || isTranscribing || !manualNotes.trim()}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-6 py-3 bg-[#00798c] hover:bg-[#006575] text-white font-semibold text-sm rounded-xl shadow-md shadow-[#00798c]/25 transition-all focus:ring-4 focus:ring-[#00798c]/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#315f9f] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#244a80] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#8AB4FF] dark:text-[#050505] dark:hover:bg-[#a9c8ff]"
               >
                 <Sparkles className="w-4 h-4 text-[#edae49]" />
                 <span>Generate Handover</span>
               </button>
-
-              {/* Demo Helper: Simulate Error */}
-              <button
-                type="button"
-                onClick={() => handleGenerateHandover(true)}
-                disabled={isProcessing || isTranscribing}
-                title="Test how error states render for judges"
-                className="px-3 py-3 text-xs text-[var(--text-muted)] hover:text-[#d1495b] hover:bg-[#d1495b]/10 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-[#d1495b]/30"
-              >
-                Test Error
-              </button>
             </div>
           </div>
-        </section>
+        </section>}
 
         {/* Loading / Error States */}
-        {isProcessing && (
+        {activeScreen === 'input' && isProcessing && (
           <section className="animate-fade-in">
             <LoadingState progressPercent={68} />
           </section>
         )}
 
-        {errorMessage && !isProcessing && (
+        {activeScreen === 'input' && errorMessage && !isProcessing && (
           <section className="animate-fade-in">
             <ErrorState
               message={errorMessage}
-              onRetry={() => handleGenerateHandover(false)}
+              onRetry={handleGenerateHandover}
             />
           </section>
         )}
 
         {/* Section 3: Handover Dashboard */}
-        {handoverResult && !isProcessing && (
-          <section className="animate-fade-in space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[var(--border-main)]">
+        {activeScreen === 'dashboard' && handoverResult && !isProcessing && (
+          <section className="mx-auto flex w-full max-w-md flex-col gap-5 pb-28 animate-fade-in scroll-mt-24 xl:max-w-7xl">
+            <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] text-[#315f9f] dark:text-[#8AB4FF]"><FileText className="h-5 w-5" /></div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-base font-bold text-[var(--text-primary)]">Current Handover</span>
+                    {handoverResult.caseId && <span className="max-w-full break-all rounded-full bg-[var(--bg-card-muted)] px-2 py-0.5 text-xs font-mono text-[var(--text-secondary)]">{handoverResult.caseId}</span>}
+                  </div>
+                  <p className="mt-0.5 break-words text-xs text-[var(--text-secondary)]">
+                    {handoverResult.patientReference ? `Patient reference: ${handoverResult.patientReference}` : 'No patient reference documented'}
+                  </p>
+                </div>
+              </div>
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-300" /> Ready
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-4 border-b border-[var(--border-main)] pb-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-xl font-bold text-[var(--text-primary)]">2. Handover Dashboard</h2>
+                  <h2 className="text-xl font-bold text-[var(--text-primary)]">Handover Dashboard</h2>
                   <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/30">
                     Analysis Completed
                   </span>
                   {handoverResult.caseId && (
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#00798c]/15 text-[#00798c] dark:text-[#38bdf8] font-mono font-medium border border-[#00798c]/30">
+                    <span className="rounded-full border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-2.5 py-0.5 text-xs font-mono font-medium text-[var(--text-secondary)]">
                       Case: {handoverResult.caseId}
                     </span>
                   )}
                   {handoverResult.patientReference && (
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#30638e]/15 text-[#30638e] dark:text-[#93c5fd] font-medium border border-[#30638e]/30">
+                    <span className="rounded-full border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-2.5 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
                       Pt: {handoverResult.patientReference}
                     </span>
                   )}
@@ -443,22 +453,31 @@ export const App: React.FC = () => {
               </div>
 
               {/* Dashboard Actions */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex w-full items-center gap-2 flex-wrap sm:w-auto">
                 <button
                   type="button"
                   onClick={handleCopySummary}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer"
+                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer sm:flex-none"
                 >
-                  <Copy className="w-3.5 h-3.5 text-[#30638e] dark:text-[#6ba1ce]" />
+                  <Copy className="w-3.5 h-3.5 text-[#315f9f] dark:text-[#8AB4FF]" />
                   <span>{copied ? 'Copied!' : 'Copy Summary'}</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleExportJson}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer"
+                  onClick={handleOpenSavedModal}
+                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-card-muted)] cursor-pointer sm:flex-none"
                 >
-                  <Download className="w-3.5 h-3.5 text-[#00798c] dark:text-[#38bdf8]" />
+                  <Database className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+                  <span>Saved Handovers</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleExportJson}
+                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer sm:flex-none"
+                >
+                  <Download className="w-3.5 h-3.5 text-[#315f9f] dark:text-[#8AB4FF]" />
                   <span>Export JSON</span>
                 </button>
 
@@ -468,16 +487,19 @@ export const App: React.FC = () => {
                   onClick={handleExportPdf}
                   disabled={!handoverResult || isExportingPdf}
                   title={!handoverResult ? 'No handover available to export' : 'Export current handover as readable PDF'}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed sm:flex-none"
                 >
-                  <FileDown className="w-3.5 h-3.5 text-[#d1495b] dark:text-[#fda4af]" />
+                  <FileDown className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
                   <span>{isExportingPdf ? 'Exporting PDF...' : pdfExported ? 'PDF Downloaded!' : 'Export PDF'}</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setHandoverResult(null)}
-                  className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg transition-colors cursor-pointer"
+                  onClick={() => {
+                    setHandoverResult(null);
+                    setActiveScreen('input');
+                  }}
+                  className="min-h-10 min-w-10 p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg transition-colors cursor-pointer"
                   title="Reset Dashboard"
                 >
                   <RotateCcw className="w-4 h-4" />
@@ -485,18 +507,22 @@ export const App: React.FC = () => {
               </div>
             </div>
 
+            <button type="button" onClick={() => setActiveScreen('input')} className="self-start text-xs font-semibold text-[#315f9f] underline-offset-2 hover:underline dark:text-[#8AB4FF]">
+              ← Back to Voice Note
+            </button>
+
             {/* Transcript Preview Box */}
-            <div className="bg-[var(--bg-card-muted)] rounded-2xl p-4 border border-[var(--border-main)]">
-              <div className="flex items-center justify-between mb-2">
+            <div className="bg-[var(--bg-card-muted)] rounded-2xl p-4 sm:p-5 border border-[var(--border-main)]">
+              <div className="flex flex-col items-start gap-2 mb-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-[#00798c] dark:text-[#38bdf8]" />
+                  <FileText className="w-3.5 h-3.5 text-[#315f9f] dark:text-[#8AB4FF]" />
                   Raw Transcript Preview
                 </span>
                 <span className="text-[11px] text-[var(--text-muted)] font-mono">
                   Shift: {handoverResult.shift}
                 </span>
               </div>
-              <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-mono bg-[var(--bg-card)] p-3 rounded-xl border border-[var(--border-main)]">
+              <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-mono bg-[var(--bg-card)] p-3.5 rounded-xl border border-[var(--border-main)] break-words">
                 "{handoverResult.rawTranscript}"
               </p>
             </div>
@@ -505,28 +531,96 @@ export const App: React.FC = () => {
             <HandoverDashboardCards items={handoverResult.items} />
           </section>
         )}
+
+        {activeScreen === 'dashboard' && !handoverResult && !isProcessing && !errorMessage && (
+          <section className="rounded-3xl border border-[var(--border-main)] bg-[var(--bg-card)] p-6 text-center shadow-sm sm:p-10">
+            <FileText className="mx-auto mb-3 h-10 w-10 text-[#00798c] dark:text-[#38bdf8]" />
+            <h2 className="text-lg font-bold text-[var(--text-primary)]">No current handover result</h2>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[var(--text-muted)]">Process reviewed notes or load a saved handover to view the structured dashboard.</p>
+            <button type="button" onClick={() => setActiveScreen('input')} className="mt-5 min-h-11 rounded-xl bg-[#00798c] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#006575]">Open Voice Note</button>
+          <button
+            type="button"
+            onClick={handleOpenSavedModal}
+            className="mt-3 min-h-11 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+            >
+            View Saved Handovers
+          </button>
+          </section>
+        )}
+
+        {activeScreen === 'export' && (
+          <section className="mx-auto flex w-full max-w-2xl flex-col gap-4 pb-28">
+            <div>
+              <h2 className="text-xl font-semibold text-[var(--text-primary)]">Export</h2>
+              <p className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]">Export the current handover using the existing available formats.</p>
+            </div>
+            {handoverResult ? (
+              <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-5 sm:flex-row">
+                <button type="button" onClick={handleExportJson} className="min-h-11 flex-1 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">Export JSON</button>
+                <button type="button" onClick={handleExportPdf} disabled={isExportingPdf} className="min-h-11 flex-1 rounded-xl bg-[#315f9f] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244a80] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">{isExportingPdf ? 'Exporting PDF...' : pdfExported ? 'PDF Downloaded!' : 'Export PDF'}</button>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-[var(--border-main)] bg-[var(--bg-card-muted)] p-8 text-center text-sm text-[var(--text-secondary)]">No current handover is available to export. Process or load a handover first.</div>
+            )}
+          </section>
+        )}
+
+        {activeScreen === 'saved' && (
+          <section className="mx-auto flex w-full max-w-3xl flex-col gap-4 pb-28">
+            <div className="px-1 pt-2">
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Saved Handover Reports</h2>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">Open, review, export, or delete handovers saved in the SQLite database.</p>
+            </div>
+            <SavedHandoversModal
+              isOpen
+              presentation="screen"
+              onClose={() => {
+                setActiveScreen('input');
+                setIsSavedModalOpen(false);
+              }}
+              savedHandovers={savedList}
+              isLoading={isLoadingSaved}
+              errorMessage={savedListError}
+              onSelectCase={handleLoadSavedCase}
+              onDeleteCase={handleDeleteSavedCase}
+              onExportCase={handleExportSavedCase}
+              exportingCaseId={exportingCaseId}
+              exportError={exportError}
+            />
+          </section>
+        )}
       </main>
 
-      {/* Saved Handovers Modal */}
-      <SavedHandoversModal
-        isOpen={isSavedModalOpen}
-        onClose={() => setIsSavedModalOpen(false)}
-        savedHandovers={savedList}
-        isLoading={isLoadingSaved}
-        errorMessage={savedListError}
-        onSelectCase={handleLoadSavedCase}
-        onDeleteCase={handleDeleteSavedCase}
-        onExportCase={handleExportSavedCase}
-        exportingCaseId={exportingCaseId}
-        exportError={exportError}
+      <MobileNav
+        activeScreen={activeScreen}
+        onLogin={() => setActiveScreen('login')}
+        onInput={() => setActiveScreen('input')}
+        onResult={() => setActiveScreen('dashboard')}
+        onExport={() => setActiveScreen('export')}
       />
+
+      {/* Saved Handovers Modal */}
+      {isSavedModalOpen && activeScreen !== 'saved' && (
+        <SavedHandoversModal
+          isOpen
+          onClose={() => setIsSavedModalOpen(false)}
+          savedHandovers={savedList}
+          isLoading={isLoadingSaved}
+          errorMessage={savedListError}
+          onSelectCase={handleLoadSavedCase}
+          onDeleteCase={handleDeleteSavedCase}
+          onExportCase={handleExportSavedCase}
+          exportingCaseId={exportingCaseId}
+          exportError={exportError}
+        />
+      )}
 
       {/* Footer */}
       <footer className="mt-auto border-t border-[var(--border-main)] bg-[var(--bg-card)] py-6 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-[var(--text-muted)] gap-2">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[var(--text-primary)]">HandoverGuard</span>
-            <span>•</span>
+            <span>-</span>
             <span>Clinical Continuity & Patient Safety System</span>
           </div>
           <div className="flex items-center gap-4 text-[var(--text-muted)]">
@@ -534,6 +628,7 @@ export const App: React.FC = () => {
           </div>
         </div>
       </footer>
+      </div>
     </div>
   );
 };

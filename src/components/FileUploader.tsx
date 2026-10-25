@@ -31,8 +31,8 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   };
 
   return (
-    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-card)] p-6 shadow-sm transition-colors duration-200">
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] p-4 transition-colors duration-200 sm:p-5">
+      <div className="flex flex-col items-start gap-1 mb-4 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="font-semibold text-[var(--text-primary)] text-base">Upload Prerecorded Audio</h3>
         <span className="text-xs text-[var(--text-muted)]">MP3, WAV, M4A, WEBM, OGG</span>
       </div>
@@ -49,6 +49,12 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
       {!selectedFile ? (
         <div
           onClick={() => !disabled && fileInputRef.current?.click()}
+          onKeyDown={(e) => {
+            if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
@@ -56,26 +62,30 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
               onFileSelected(e.dataTransfer.files[0]);
             }
           }}
-          className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center gap-3 transition-colors text-center ${
+          role="button"
+          tabIndex={disabled ? -1 : 0}
+          aria-label="Choose an audio file to upload"
+          aria-disabled={disabled}
+          className={`min-h-40 border border-dashed rounded-xl p-5 sm:p-6 flex flex-col items-center justify-center gap-3 transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] ${
             disabled
               ? 'opacity-50 cursor-not-allowed border-[var(--border-main)] bg-[var(--bg-card-muted)]'
-              : 'border-[var(--border-main)] hover:border-[#00798c] dark:hover:border-[#38bdf8] hover:bg-[#00798c]/5 cursor-pointer bg-[var(--bg-input)]'
+              : 'border-[var(--border-main)] hover:border-[#315f9f] dark:hover:border-[#8AB4FF] hover:bg-[var(--bg-card-muted)] cursor-pointer bg-[var(--bg-input)]'
           }`}
         >
-          <div className="w-12 h-12 rounded-full bg-[#00798c]/10 text-[#00798c] dark:text-[#38bdf8] flex items-center justify-center">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] text-[#315f9f] dark:text-[#8AB4FF]">
             <Upload className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm font-medium text-[var(--text-primary)]">
-              Drag & drop audio note, or <span className="text-[#00798c] dark:text-[#38bdf8] font-semibold underline">browse</span>
+            <p className="text-sm font-medium leading-relaxed text-[var(--text-primary)]">
+              Drag & drop audio note, or <span className="font-semibold text-[#315f9f] underline dark:text-[#8AB4FF]">browse</span>
             </p>
             <p className="text-xs text-[var(--text-muted)] mt-1">Supports audio files up to 25MB</p>
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-between p-4 bg-[#00798c]/10 border border-[#00798c]/30 rounded-xl">
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] p-4">
           <div className="flex items-center gap-3 truncate">
-            <div className="w-10 h-10 rounded-lg bg-[#00798c] text-white flex items-center justify-center shrink-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#315f9f] text-white dark:bg-[#8AB4FF] dark:text-[#050505]">
               <FileAudio className="w-5 h-5" />
             </div>
             <div className="truncate">
@@ -86,7 +96,8 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
           <button
             type="button"
             onClick={onClearFile}
-            className="p-1.5 text-[var(--text-muted)] hover:text-[#d1495b] hover:bg-[#d1495b]/10 rounded-lg transition-colors cursor-pointer ml-2 shrink-0"
+            aria-label="Remove selected audio file"
+            className="min-h-10 min-w-10 flex items-center justify-center p-1.5 text-[var(--text-muted)] hover:text-[#d1495b] hover:bg-[#d1495b]/10 rounded-lg transition-colors cursor-pointer ml-2 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d1495b]"
             title="Remove file"
           >
             <X className="w-4 h-4" />
