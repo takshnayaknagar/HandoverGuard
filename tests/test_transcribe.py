@@ -344,11 +344,16 @@ def test_process_handover_contract_unchanged(client: TestClient, monkeypatch):
     )
     response = client.post("/process-handover", json={"transcript": "Fictional."})
     assert response.status_code == 200
-    assert set(response.json().keys()) == {
+    body = response.json()
+    assert set(body.keys()) == {
         "patient_reference",
         "completed",
         "pending",
         "follow_up",
         "communication",
         "unclear_or_undocumented",
+        "case_id",
+        "created_at",
     }
+    assert isinstance(body["case_id"], str) and body["case_id"]
+    assert isinstance(body["created_at"], str) and body["created_at"]

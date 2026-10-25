@@ -115,10 +115,17 @@ def process_handover(
         result = process_transcript_with_llm(transcript)
 
         # Save only a successfully generated, validated handover.
-        save_handover(transcript, result.model_dump())
+        case_id = save_handover(transcript, result.model_dump())
+        saved_record = get_handover(case_id)
 
-        # Preserve the existing frontend response contract.
-        return result
+        if saved_record is None:
+            raise RuntimeError("Saved handover could not be retrieved.")
+
+        # Return the saved record's exact metadata with the clinical result.
+        response = result.model_dump()
+        response["case_id"] = case_id
+        response["created_at"] = saved_record["created_at"]
+        return response
 
     except LLMNotConfiguredError:
         return _error_response(

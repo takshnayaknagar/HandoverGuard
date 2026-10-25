@@ -60,7 +60,16 @@ def test_valid_transcript_returns_six_field_handover(client: TestClient, mock_ll
         "follow_up",
         "communication",
         "unclear_or_undocumented",
+        "case_id",
+        "created_at",
     }
+    assert isinstance(body["case_id"], str)
+    assert body["case_id"]
+    assert isinstance(body["created_at"], str)
+    assert body["created_at"]
+    saved_record = main.get_handover(body["case_id"])
+    assert saved_record is not None
+    assert saved_record["created_at"] == body["created_at"]
     assert body["patient_reference"] == "Bed 4"
     assert body["completed"] == ["Morning medications given"]
     assert body["pending"] == ["Blood test results pending"]

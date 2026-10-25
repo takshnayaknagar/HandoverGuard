@@ -168,25 +168,9 @@ export const generateHandover = async (
 
   const backend = (await response.json()) as BackendHandover;
 
-  // Attempt to associate the newly generated SQLite case_id if available
-  let caseId: string | undefined;
-  let createdAt: string | undefined;
-  try {
-    const listRes = await fetch(HANDOVERS_URL);
-    if (listRes.ok) {
-      const list = (await listRes.json()) as SavedHandoverSummary[];
-      if (Array.isArray(list) && list.length > 0) {
-        caseId = list[0].case_id;
-        createdAt = list[0].created_at;
-      }
-    }
-  } catch {
-    // Continue gracefully if listing latest case is unavailable
-  }
-
-  return mapBackendResponse(backend, transcript, { caseId, createdAt });
+  // Use the exact saved record metadata returned by the backend.
+  return mapBackendResponse(backend, transcript);
 };
-
 /**
  * Fetch all saved handover cases from the SQLite database.
  */
