@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { MobileNav } from './components/MobileNav';
 import { VoiceRecorder } from './components/VoiceRecorder';
@@ -17,7 +17,6 @@ import {
   deleteSavedHandover,
   type SavedHandoverSummary
 } from './services/handoverApi';
-import { exportHandoverToPdf } from './services/pdfExport';
 import { 
   Sparkles, 
   FileText, 
@@ -171,6 +170,7 @@ export const App: React.FC = () => {
     setExportingCaseId(caseId);
     try {
       const handover = await fetchSavedHandoverById(caseId);
+      const { exportHandoverToPdf } = await import('./services/pdfExport');
       await exportHandoverToPdf(handover);
     } catch (err: unknown) {
       setExportError(
@@ -259,6 +259,7 @@ export const App: React.FC = () => {
     setErrorMessage(null);
 
     try {
+      const { exportHandoverToPdf } = await import('./services/pdfExport');
       await exportHandoverToPdf(handoverResult);
       setPdfExported(true);
       setTimeout(() => setPdfExported(false), 2500);
