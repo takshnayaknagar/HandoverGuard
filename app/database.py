@@ -3,6 +3,7 @@ import json
 import os
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -17,15 +18,67 @@ def get_connection():
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DATABASE_PATH)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
     return connection
 
 
+@contextmanager
+def _connection():
+    connection = get_connection()
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
+
+
 def initialize_database():
-    """Create the cases table if it doesn't already exist."""
-    with get_connection() as connection:
+    """Create the schema and apply repeatable, non-destructive migrations."""
+    with _connection() as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version INTEGER PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                user_id TEXT PRIMARY KEY,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+            )
+            """
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sessions (
+                session_id TEXT PRIMARY KEY,
+                token_hash TEXT NOT NULL UNIQUE,
+                user_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                revoked_at TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+            )
+            """
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)"
+        )
+
         connection.execute("""
             CREATE TABLE IF NOT EXISTS handovers (
                 case_id TEXT PRIMARY KEY,
+                owner_id TEXT REFERENCES users(user_id) ON DELETE RESTRICT,
                 patient_reference TEXT,
                 transcript TEXT NOT NULL,
                 completed TEXT NOT NULL,
@@ -37,24 +90,45 @@ def initialize_database():
             )
         """)
 
+        handover_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(handovers)")
+        }
+        if "owner_id" not in handover_columns:
+            # Existing rows receive NULL and remain legacy/unowned. They are
+            # deliberately not assigned to the demo account by this migration.
+            connection.execute(
+                "ALTER TABLE handovers ADD COLUMN owner_id TEXT REFERENCES users(user_id) ON DELETE RESTRICT"
+            )
 
-def save_handover(transcript: str, handover: dict) -> str:
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_handovers_owner_id ON handovers(owner_id)"
+        )
+        connection.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+            (1, datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def save_handover(transcript: str, handover: dict, owner_id: str) -> str:
     """Save a processed handover and return its unique case ID."""
+    if not isinstance(owner_id, str) or not owner_id.strip():
+        raise ValueError("A non-empty owner ID is required")
     case_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
 
-    with get_connection() as connection:
+    with _connection() as connection:
         connection.execute(
             """
             INSERT INTO handovers (
-                case_id, patient_reference, transcript, completed,
+                case_id, owner_id, patient_reference, transcript, completed,
                 pending, follow_up, communication,
                 unclear_or_undocumented, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 case_id,
+                owner_id,
                 handover.get("patient_reference"),
                 transcript,
                 json.dumps(handover.get("completed", [])),
@@ -69,26 +143,34 @@ def save_handover(transcript: str, handover: dict) -> str:
     return case_id
 
 
-def list_handovers() -> list[dict]:
-    """Return saved cases, newest first."""
-    with get_connection() as connection:
+def list_handovers(owner_id: str) -> list[dict]:
+    """Return this owner's saved cases, newest first."""
+    if not isinstance(owner_id, str) or not owner_id.strip():
+        raise ValueError("A non-empty owner ID is required")
+
+    with _connection() as connection:
         rows = connection.execute(
             """
             SELECT case_id, patient_reference, created_at
             FROM handovers
+            WHERE owner_id = ?
             ORDER BY created_at DESC
-            """
+            """,
+            (owner_id,),
         ).fetchall()
 
     return [dict(row) for row in rows]
 
 
-def get_handover(case_id: str) -> dict | None:
+def get_handover(case_id: str, owner_id: str) -> dict | None:
     """Retrieve a saved case, including its full handover."""
-    with get_connection() as connection:
+    if not isinstance(owner_id, str) or not owner_id.strip():
+        raise ValueError("A non-empty owner ID is required")
+
+    with _connection() as connection:
         row = connection.execute(
-            "SELECT * FROM handovers WHERE case_id = ?",
-            (case_id,),
+            "SELECT * FROM handovers WHERE case_id = ? AND owner_id = ?",
+            (case_id, owner_id),
         ).fetchone()
 
     if row is None:
@@ -106,15 +188,17 @@ def get_handover(case_id: str) -> dict | None:
 
     return result
 
-def delete_handover(case_id: str) -> bool:
+def delete_handover(case_id: str, owner_id: str) -> bool:
     """Delete a saved handover by case ID.
 
     Returns True if a handover was deleted, otherwise False.
     """
-    with get_connection() as connection:
-        cursor = connection.execute(
-            "DELETE FROM handovers WHERE case_id = ?",
-            (case_id,),
-        )
+    if not isinstance(owner_id, str) or not owner_id.strip():
+        raise ValueError("A non-empty owner ID is required")
 
+    with _connection() as connection:
+        cursor = connection.execute(
+            "DELETE FROM handovers WHERE case_id = ? AND owner_id = ?",
+            (case_id, owner_id),
+        )
     return cursor.rowcount > 0

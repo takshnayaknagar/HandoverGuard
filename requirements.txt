@@ -12,6 +12,7 @@ ctranslate2==4.8.3
 # av 19 dropped the metadata_errors argument that faster-whisper 1.2.1 uses
 av==18.1.0
 python-multipart==0.0.32
+argon2-cffi==25.1.0
 
 # Testing (httpx is required by FastAPI's TestClient)
 pytest==9.1.1

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # Server settings
     app_host: str = "127.0.0.1"
     app_port: int = 8000
+    app_env: str = "development"
 
     # CORS: only this origin may call the API from a browser.
     frontend_origin: str = "http://localhost:3000"

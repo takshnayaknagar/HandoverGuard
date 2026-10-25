@@ -1,13 +1,15 @@
-"""HandoverGuard backend — FastAPI application entry point."""
+﻿"""HandoverGuard backend â€” FastAPI application entry point."""
 
 import asyncio
+from datetime import datetime, timezone
 import os
 import tempfile
 
-from fastapi import FastAPI, File, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from app import stt_service
 from app.ai_service import (
@@ -25,6 +27,13 @@ from app.database import (
     list_handovers,
     get_handover,
     delete_handover,
+)
+from app.auth import (
+    create_session,
+    get_user_by_username,
+    get_user_for_session,
+    revoke_session,
+    verify_password,
 )
 from app.schemas import HandoverRequest, HandoverResponse
 from app.stt_service import STTBusyError, STTModelError, STTTimeoutError
@@ -47,9 +56,34 @@ def startup():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_origin],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Content-Type"],
+    allow_credentials=True,
 )
+
+SESSION_COOKIE = "handoverguard_session"
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(min_length=1, max_length=320)
+    password: str = Field(min_length=1, max_length=256)
+
+
+def _check_origin(request: Request) -> None:
+    origin = request.headers.get("origin")
+    if origin != settings.frontend_origin:
+        raise HTTPException(status_code=403, detail="Request origin is not allowed")
+
+
+def _current_user(request: Request) -> dict:
+    user = get_user_for_session(request.cookies.get(SESSION_COOKIE, ""))
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user
+
+
+def _cookie_secure() -> bool:
+    return settings.app_env.casefold() == "production"
 
 
 def _error_response(
@@ -73,7 +107,7 @@ def handle_validation_error(
     return _error_response(
         422,
         "invalid_request_body",
-        "Request body must be JSON with a non-empty 'transcript' string field.",
+        "Request body is invalid or does not match the expected format.",
     )
 
 
@@ -83,15 +117,52 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.post("/login")
+def login(payload: LoginRequest, request: Request, response: Response) -> dict:
+    _check_origin(request)
+    user = get_user_by_username(payload.username)
+    if user is None or not user["is_active"] or not verify_password(payload.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    token, expires_at = create_session(user["user_id"])
+    response.set_cookie(
+        SESSION_COOKIE,
+        token,
+        httponly=True,
+        secure=_cookie_secure(),
+        samesite="lax",
+        expires=expires_at,
+        max_age=int((expires_at - datetime.now(timezone.utc)).total_seconds()),
+        path="/",
+    )
+    return {"user_id": user["user_id"], "username": user["username"]}
+
+
+@app.post("/logout")
+def logout(request: Request, response: Response) -> dict:
+    _check_origin(request)
+    token = request.cookies.get(SESSION_COOKIE, "")
+    revoke_session(token)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return {"status": "ok"}
+
+
+@app.get("/me")
+def me(user: dict = Depends(_current_user)) -> dict:
+    return {"user_id": user["user_id"], "username": user["username"]}
+
+
 # --- Process and save a handover ----------------------------------------------
 
 
 @app.post("/process-handover", response_model=None)
 def process_handover(
-    request: HandoverRequest,
+    payload: HandoverRequest,
+    request: Request,
+    user: dict = Depends(_current_user),
 ) -> HandoverResponse | JSONResponse:
     """Process a transcript and save the resulting handover."""
-    transcript = request.transcript
+    _check_origin(request)
+    transcript = payload.transcript
 
     if not transcript.strip():
         return _error_response(
@@ -115,8 +186,8 @@ def process_handover(
         result = process_transcript_with_llm(transcript)
 
         # Save only a successfully generated, validated handover.
-        case_id = save_handover(transcript, result.model_dump())
-        saved_record = get_handover(case_id)
+        case_id = save_handover(transcript, result.model_dump(), owner_id=user["user_id"])
+        saved_record = get_handover(case_id, owner_id=user["user_id"])
 
         if saved_record is None:
             raise RuntimeError("Saved handover could not be retrieved.")
@@ -167,15 +238,15 @@ def process_handover(
 
 
 @app.get("/handovers")
-def get_all_handovers() -> list[dict]:
+def get_all_handovers(user: dict = Depends(_current_user)) -> list[dict]:
     """List saved cases, newest first, with their IDs and timestamps."""
-    return list_handovers()
+    return list_handovers(owner_id=user["user_id"])
 
 
 @app.get("/handovers/{case_id}", response_model=None)
-def get_saved_handover(case_id: str) -> dict | JSONResponse:
+def get_saved_handover(case_id: str, user: dict = Depends(_current_user)) -> dict | JSONResponse:
     """Retrieve one saved case using its unique case ID."""
-    handover = get_handover(case_id)
+    handover = get_handover(case_id, owner_id=user["user_id"])
 
     if handover is None:
         return _error_response(
@@ -187,9 +258,10 @@ def get_saved_handover(case_id: str) -> dict | JSONResponse:
     return handover
 
 @app.delete("/handovers/{case_id}", response_model=None)
-def delete_saved_handover(case_id: str) -> dict | JSONResponse:
+def delete_saved_handover(case_id: str, request: Request, user: dict = Depends(_current_user)) -> dict | JSONResponse:
     """Delete one saved handover using its unique case ID."""
-    deleted = delete_handover(case_id)
+    _check_origin(request)
+    deleted = delete_handover(case_id, owner_id=user["user_id"])
 
     if not deleted:
         return _error_response(
@@ -233,9 +305,12 @@ def _is_supported_audio(header: bytes) -> bool:
 
 @app.post("/transcribe", response_model=None)
 async def transcribe(
+    request: Request,
     audio: UploadFile = File(...),
+    user: dict = Depends(_current_user),
 ) -> dict[str, str] | JSONResponse:
     """Convert an audio note into text for clinician review."""
+    _check_origin(request)
     if audio.content_type and not audio.content_type.startswith("audio/"):
         return _error_response(
             400,

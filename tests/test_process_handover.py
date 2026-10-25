@@ -67,7 +67,11 @@ def test_valid_transcript_returns_six_field_handover(client: TestClient, mock_ll
     assert body["case_id"]
     assert isinstance(body["created_at"], str)
     assert body["created_at"]
-    saved_record = main.get_handover(body["case_id"])
+    user_response = client.get("/me")
+    assert user_response.status_code == 200
+    user_id = user_response.json()["user_id"]
+
+    saved_record = main.get_handover(body["case_id"], owner_id=user_id)
     assert saved_record is not None
     assert saved_record["created_at"] == body["created_at"]
     assert body["patient_reference"] == "Bed 4"
@@ -115,7 +119,9 @@ def test_missing_transcript_field_rejected(client: TestClient):
     assert response.status_code == 422
     error = response.json()["error"]
     assert error["code"] == "invalid_request_body"
-    assert "transcript" in error["message"]
+    assert error["message"] == (
+        "Request body is invalid or does not match the expected format."
+    )
 
 
 def test_wrong_type_transcript_rejected(client: TestClient):
