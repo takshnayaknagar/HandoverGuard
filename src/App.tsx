@@ -75,6 +75,8 @@ export const App: React.FC = () => {
   // Export PDF state for individual saved handovers
   const [exportingCaseId, setExportingCaseId] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [exportingSavedAction, setExportingSavedAction] = useState<string | null>(null);
+  const [exportScreenError, setExportScreenError] = useState<string | null>(null);
 
   // Audio recorder handlers
   const handleAudioReady = (blob: Blob, url: string) => {
@@ -122,6 +124,33 @@ export const App: React.FC = () => {
       setIsLoadingSaved(false);
     }
   };
+
+  useEffect(() => {
+    if (activeScreen !== 'export') return;
+
+    let cancelled = false;
+    setIsLoadingSaved(true);
+    setExportScreenError(null);
+
+    fetchSavedHandovers()
+      .then((list) => {
+        if (!cancelled) setSavedList(list);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setExportScreenError(
+            err instanceof Error ? err.message : 'Could not fetch saved handovers from the database.'
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingSaved(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeScreen]);
 
   const handleDeleteSavedCase = async (caseId: string) => {
   const confirmed = window.confirm(
@@ -178,6 +207,46 @@ export const App: React.FC = () => {
       );
     } finally {
       setExportingCaseId(null);
+    }
+  };
+
+  const getSafeExportCaseId = (caseId: string) =>
+    caseId.trim().replace(/[^a-zA-Z0-9_-]/g, '_') || 'unknown-case';
+
+  const handleExportSavedJson = async (caseId: string) => {
+    const actionKey = `${caseId}:json`;
+    setExportScreenError(null);
+    setExportingSavedAction(actionKey);
+
+    try {
+      const handover = await fetchSavedHandoverById(caseId);
+      const blob = new Blob([JSON.stringify(handover, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `handover-${getSafeExportCaseId(caseId)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      setExportScreenError(err instanceof Error ? err.message : 'Failed to export the saved handover as JSON.');
+    } finally {
+      setExportingSavedAction(null);
+    }
+  };
+
+  const handleExportSavedPdf = async (caseId: string) => {
+    const actionKey = `${caseId}:pdf`;
+    setExportScreenError(null);
+    setExportingSavedAction(actionKey);
+
+    try {
+      const handover = await fetchSavedHandoverById(caseId);
+      const { exportHandoverToPdf } = await import('./services/pdfExport');
+      await exportHandoverToPdf(handover);
+    } catch (err: unknown) {
+      setExportScreenError(err instanceof Error ? err.message : 'Failed to export the saved handover as PDF.');
+    } finally {
+      setExportingSavedAction(null);
     }
   };
 
@@ -563,6 +632,70 @@ export const App: React.FC = () => {
             ) : (
               <div className="rounded-2xl border border-dashed border-[var(--border-main)] bg-[var(--bg-card-muted)] p-8 text-center text-sm text-[var(--text-secondary)]">No current handover is available to export. Process or load a handover first.</div>
             )}
+
+            <div className="mt-2 flex flex-col gap-3">
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-[var(--text-primary)]">Previous Handovers</h3>
+                  <p className="mt-1 text-xs text-[var(--text-secondary)]">Export a saved record from SQLite.</p>
+                </div>
+                {savedList.length > 0 && <span className="text-xs text-[var(--text-muted)]">{savedList.length} saved</span>}
+              </div>
+
+              {exportScreenError && (
+                <div role="alert" className="rounded-xl border border-rose-500/25 bg-rose-500/10 p-3 text-xs text-rose-700 dark:text-rose-300">
+                  {exportScreenError}
+                </div>
+              )}
+
+              {isLoadingSaved ? (
+                <div className="rounded-2xl border border-dashed border-[var(--border-main)] bg-[var(--bg-card-muted)] p-6 text-center text-sm text-[var(--text-secondary)]">
+                  Loading previous handovers...
+                </div>
+              ) : savedList.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[var(--border-main)] bg-[var(--bg-card-muted)] p-6 text-center text-sm text-[var(--text-secondary)]">
+                  No previous handovers are available.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {savedList.map((item) => {
+                    const pdfKey = `${item.case_id}:pdf`;
+                    const jsonKey = `${item.case_id}:json`;
+                    return (
+                      <article key={item.case_id} className="flex flex-col gap-3 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="break-all font-mono text-sm font-semibold text-[var(--text-primary)]">{item.case_id}</p>
+                          <p className="mt-1 break-words text-xs text-[var(--text-secondary)]">
+                            {item.patient_reference ? `Patient reference: ${item.patient_reference}` : 'No patient reference documented'}
+                          </p>
+                          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                            Saved {new Date(item.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-52">
+                          <button
+                            type="button"
+                            onClick={() => handleExportSavedPdf(item.case_id)}
+                            disabled={exportingSavedAction !== null}
+                            className="min-h-10 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+                          >
+                            {exportingSavedAction === pdfKey ? 'Exporting...' : 'Export PDF'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleExportSavedJson(item.case_id)}
+                            disabled={exportingSavedAction !== null}
+                            className="min-h-10 rounded-lg bg-[#315f9f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#244a80] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+                          >
+                            {exportingSavedAction === jsonKey ? 'Exporting...' : 'Export JSON'}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </section>
         )}
 
