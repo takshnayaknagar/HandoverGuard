@@ -61,3 +61,20 @@ def test_expired_and_unknown_sessions_are_rejected(monkeypatch, tmp_path):
         )
     assert auth.get_user_for_session(token) is None
     assert auth.get_user_for_session("malformed") is None
+
+
+def test_inactive_user_session_is_rejected(monkeypatch, tmp_path):
+    monkeypatch.setattr(database, "DATABASE_PATH", tmp_path / "auth.db")
+
+    user_id = auth.create_user("demo", "a sufficiently long password")
+    token, _ = auth.create_session(user_id)
+
+    assert auth.get_user_for_session(token)["user_id"] == user_id
+
+    with database._connection() as connection:
+        connection.execute(
+            "UPDATE users SET is_active = 0 WHERE user_id = ?",
+            (user_id,),
+        )
+
+    assert auth.get_user_for_session(token) is None

@@ -9,6 +9,8 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
+    port: 3000,
+    strictPort: true,
     proxy: {
       // Frontend calls /api/* same-origin; Vite forwards to the FastAPI backend.
       '/api': {

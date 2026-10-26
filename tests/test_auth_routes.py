@@ -91,6 +91,15 @@ def test_saved_handovers_require_authentication_and_are_owner_scoped(anonymous_c
     assert anonymous_client.get(f"/handovers/{legacy_id}").status_code == 404
     assert anonymous_client.delete(f"/handovers/{other_id}").status_code == 404
     assert anonymous_client.delete(f"/handovers/{legacy_id}").status_code == 404
+    # Switch to user B and verify the reverse ownership boundary.
+    _login(anonymous_client, "b", "a sufficiently long password")
+
+    listed_as_b = anonymous_client.get("/handovers").json()
+    assert {record["case_id"] for record in listed_as_b} == {other_id}
+
+    assert anonymous_client.get(f"/handovers/{other_id}").status_code == 200
+    assert anonymous_client.get(f"/handovers/{owned_id}").status_code == 404
+    assert anonymous_client.delete(f"/handovers/{owned_id}").status_code == 404
 
     # Confirm the protected records and legacy record remain intact.
     assert database.get_handover(owned_id, owner_id=user_a) is not None

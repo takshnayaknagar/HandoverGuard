@@ -12,6 +12,51 @@ const PROCESS_URL = '/api/process-handover';
 const TRANSCRIBE_URL = '/api/transcribe';
 const HANDOVERS_URL = '/api/handovers';
 
+export interface AuthenticatedUser {
+  user_id: string;
+  username: string;
+}
+
+export class SessionExpiredError extends Error {
+  constructor() {
+    super('Your session has expired. Please sign in again.');
+    this.name = 'SessionExpiredError';
+  }
+}
+
+const fetchWithSession = async (input: RequestInfo | URL, init: RequestInit = {}) => {
+  const response = await fetch(input, { ...init, credentials: 'include' });
+  if (response.status === 401) {
+    window.dispatchEvent(new Event('handoverguard:session-expired'));
+    throw new SessionExpiredError();
+  }
+  return response;
+};
+
+export const getCurrentUser = async (): Promise<AuthenticatedUser | null> => {
+  const response = await fetch('/api/me', { credentials: 'include' });
+  if (response.status === 401) return null;
+  if (!response.ok) throw new Error(`Could not verify the current session (status ${response.status}).`);
+  return response.json() as Promise<AuthenticatedUser>;
+};
+
+export const login = async (username: string, password: string): Promise<AuthenticatedUser> => {
+  const response = await fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ username, password })
+  });
+  const body = await response.json().catch(() => null) as { detail?: string; error?: { message?: string } } | null;
+  if (!response.ok) throw new Error(body?.error?.message || body?.detail || 'Invalid staff ID or password.');
+  return body as AuthenticatedUser;
+};
+
+export const logout = async (): Promise<void> => {
+  const response = await fetchWithSession('/api/logout', { method: 'POST' });
+  if (!response.ok) throw new Error('Could not sign out. Please try again.');
+};
+
 /**
  * Upload audio to local Whisper STT. The returned transcript must be
  * reviewed and edited by the clinician before generateHandover is called.
@@ -29,7 +74,7 @@ export const transcribeAudio = async (audio: Blob | File): Promise<string> => {
 
   formData.append('audio', audio, filename);
 
-  const response = await fetch(TRANSCRIBE_URL, {
+  const response = await fetchWithSession(TRANSCRIBE_URL, {
     method: 'POST',
     body: formData
   });
@@ -148,7 +193,7 @@ export const generateHandover = async (
     );
   }
 
-  const response = await fetch(PROCESS_URL, {
+  const response = await fetchWithSession(PROCESS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ transcript })
@@ -175,7 +220,7 @@ export const generateHandover = async (
  * Fetch all saved handover cases from the SQLite database.
  */
 export const fetchSavedHandovers = async (): Promise<SavedHandoverSummary[]> => {
-  const response = await fetch(HANDOVERS_URL);
+  const response = await fetchWithSession(HANDOVERS_URL);
   if (!response.ok) {
     throw new Error(`Failed to fetch saved handovers with status ${response.status}.`);
   }
@@ -186,7 +231,7 @@ export const fetchSavedHandovers = async (): Promise<SavedHandoverSummary[]> => 
  * Fetch a specific saved handover case by its unique case_id.
  */
 export const fetchSavedHandoverById = async (caseId: string): Promise<HandoverOutput> => {
-  const response = await fetch(`${HANDOVERS_URL}/${encodeURIComponent(caseId)}`);
+  const response = await fetchWithSession(`${HANDOVERS_URL}/${encodeURIComponent(caseId)}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch handover "${caseId}" with status ${response.status}.`);
   }
@@ -206,7 +251,7 @@ export const fetchSavedHandoverById = async (caseId: string): Promise<HandoverOu
  * Delete one saved handover from the SQLite-backed API.
  */
 export const deleteSavedHandover = async (caseId: string): Promise<void> => {
-  const response = await fetch(
+  const response = await fetchWithSession(
     `${HANDOVERS_URL}/${encodeURIComponent(caseId)}`,
     { method: 'DELETE' }
   );

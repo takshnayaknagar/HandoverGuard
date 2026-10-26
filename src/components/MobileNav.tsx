@@ -3,6 +3,7 @@ import { Download, LayoutDashboard, LogIn, Mic } from 'lucide-react';
 
 interface MobileNavProps {
   activeScreen: 'login' | 'input' | 'dashboard' | 'export' | 'saved';
+  isAuthenticated: boolean;
   onLogin: () => void;
   onInput: () => void;
   onResult: () => void;
@@ -11,6 +12,7 @@ interface MobileNavProps {
 
 export const MobileNav: React.FC<MobileNavProps> = ({
   activeScreen,
+  isAuthenticated,
   onLogin,
   onInput,
   onResult,
@@ -22,17 +24,18 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-main)] bg-[var(--nav-bg)] pb-safe shadow-[0_-1px_12px_rgba(0,0,0,0.12)] backdrop-blur-xl sm:hidden"
     >
       <div className="mx-auto flex h-20 max-w-lg items-center justify-around px-1">
-        <button
-          type="button"
-          onClick={onLogin}
-          aria-current={activeScreen === 'login' ? 'page' : undefined}
-          aria-label="Open login placeholder"
-          className={`relative flex h-16 min-w-16 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1 transition-all duration-150 hover:bg-[var(--bg-card-muted)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] ${activeScreen === 'login' ? 'scale-105 font-semibold text-[#315f9f] dark:text-[#8AB4FF]' : 'text-[var(--text-secondary)]'}`}
-        >
-          <LogIn className="h-5 w-5" aria-hidden="true" />
-          <span className="text-[10px] font-medium leading-none">Login</span>
-        </button>
-
+        {!isAuthenticated && (
+          <button
+            type="button"
+            onClick={onLogin}
+            aria-current={activeScreen === 'login' ? 'page' : undefined}
+            aria-label="Open login placeholder"
+            className={`relative flex h-16 min-w-16 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1 transition-all duration-150 hover:bg-[var(--bg-card-muted)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] ${activeScreen === 'login' ? 'scale-105 font-semibold text-[#315f9f] dark:text-[#8AB4FF]' : 'text-[var(--text-secondary)]'}`}
+          >
+            <LogIn className="h-5 w-5" aria-hidden="true" />
+            <span className="text-[10px] font-medium leading-none">Login</span>
+          </button>
+        )}
         <button
           type="button"
           onClick={onInput}

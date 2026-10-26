@@ -7,6 +7,7 @@ import { ManualNotesInput } from './components/ManualNotesInput';
 import { HandoverDashboardCards } from './components/CategoryCard';
 import { LoadingState, ErrorState } from './components/StatusStates';
 import { SavedHandoversModal } from './components/SavedHandoversModal';
+import { LoginScreen } from './components/screens/LoginScreen';
 import type { HandoverOutput } from './types/handover';
 import { SAMPLE_HANDOVER_OUTPUT } from './data/sampleData';
 import {
@@ -15,7 +16,11 @@ import {
   fetchSavedHandovers,
   fetchSavedHandoverById,
   deleteSavedHandover,
-  type SavedHandoverSummary
+  type SavedHandoverSummary,
+  getCurrentUser,
+  login,
+  logout,
+  type AuthenticatedUser
 } from './services/handoverApi';
 import { 
   Sparkles, 
@@ -25,12 +30,14 @@ import {
   FileDown,
   RotateCcw,
   Stethoscope,
-  Database,
-  LogIn
+  Database
 } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeScreen, setActiveScreen] = useState<'login' | 'input' | 'dashboard' | 'export' | 'saved'>('input');
+  const [activeScreen, setActiveScreen] = useState<'login' | 'input' | 'dashboard' | 'export' | 'saved'>('login');
+  const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
   // Theme state: default to dark if preferred or stored in localStorage
   const [isDark, setIsDark] = useState<boolean>(() => {
     const saved = localStorage.getItem('handoverguard-theme');
@@ -49,6 +56,58 @@ export const App: React.FC = () => {
   }, [isDark]);
 
   const toggleTheme = () => setIsDark((prev) => !prev);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentUser()
+      .then((user) => {
+        if (cancelled) return;
+        setCurrentUser(user);
+        setActiveScreen(user ? 'input' : 'login');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCurrentUser(null);
+          setActiveScreen('login');
+          setAuthMessage('Unable to verify your session. Please sign in again.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsAuthChecking(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setCurrentUser(null);
+      setActiveScreen('login');
+      setAuthMessage('Your session has expired. Please sign in again.');
+    };
+    window.addEventListener('handoverguard:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('handoverguard:session-expired', handleSessionExpired);
+  }, []);
+
+  const handleLogin = async (staffId: string, password: string, _department: string) => {
+    await login(staffId, password);
+    const user = await getCurrentUser();
+    if (!user) throw new Error('Sign-in could not be confirmed. Please try again.');
+    setCurrentUser(user);
+    setAuthMessage(null);
+    setActiveScreen('input');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setAuthMessage(null);
+    } catch (error) {
+      setAuthMessage(error instanceof Error ? error.message : 'Could not sign out.');
+    } finally {
+      setCurrentUser(null);
+      setActiveScreen('login');
+    }
+  };
 
   // Input states
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
@@ -353,18 +412,18 @@ export const App: React.FC = () => {
       />
 
       <main className="flex-1 w-full mx-auto px-4 pb-28 pt-4 sm:px-6 sm:py-8 lg:px-12 flex flex-col gap-5 sm:gap-8">
-        {activeScreen === 'login' && (
-          <section className="mx-auto flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-8 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] text-[var(--text-secondary)]">
-              <LogIn className="h-5 w-5" />
-            </div>
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Login is not available yet</h2>
-            <p className="max-w-sm text-sm leading-relaxed text-[var(--text-secondary)]">Authentication has not been implemented. You can continue using the Voice Note, Dashboard, and Export areas without signing in.</p>
-            <button type="button" onClick={() => setActiveScreen('input')} className="min-h-11 rounded-xl bg-[#315f9f] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#244a80] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">Open Voice Note</button>
-          </section>
-        )}
+        {isAuthChecking && <section className="mx-auto flex w-full max-w-md items-center justify-center rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-10 text-sm text-[var(--text-secondary)]">Checking session...</section>}
+      {!isAuthChecking && !currentUser && (
+      <LoginScreen
+      rememberedStaffId={localStorage.getItem('handoverguard-staff-id') || ''}
+      onLogin={handleLogin}
+      authMessage={authMessage}
+      />
+      )}
+        {!isAuthChecking && currentUser && authMessage && <div role="alert" className="mx-auto w-full max-w-3xl rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-3 text-sm text-[var(--text-primary)]">{authMessage}</div>}
+        {!isAuthChecking && currentUser && <div className="flex justify-end"><button type="button" onClick={handleLogout} className="min-h-10 rounded-xl border border-[var(--border-main)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">Sign out</button></div>}
 
-        {activeScreen === 'input' && <div className="mx-auto flex w-full max-w-md items-center justify-between rounded-xl border border-[#eceef0] bg-[var(--bg-card-muted)] p-3 shadow-sm dark:border-[var(--border-main)]">
+        {currentUser && activeScreen === 'input' && <div className="mx-auto flex w-full max-w-md items-center justify-between rounded-xl border border-[#eceef0] bg-[var(--bg-card-muted)] p-3 shadow-sm dark:border-[var(--border-main)]">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eceef0] text-[#191c1e] dark:bg-[var(--bg-card)] dark:text-[var(--text-primary)]">
               <Stethoscope className="h-5 w-5" />
@@ -727,10 +786,11 @@ export const App: React.FC = () => {
 
       <MobileNav
         activeScreen={activeScreen}
+        isAuthenticated={Boolean(currentUser)}
         onLogin={() => setActiveScreen('login')}
-        onInput={() => setActiveScreen('input')}
-        onResult={() => setActiveScreen('dashboard')}
-        onExport={() => setActiveScreen('export')}
+        onInput={() => { if (currentUser) setActiveScreen('input'); }}
+        onResult={() => { if (currentUser) setActiveScreen('dashboard'); }}
+        onExport={() => { if (currentUser) setActiveScreen('export'); }}
       />
 
       {/* Saved Handovers Modal */}
