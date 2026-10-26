@@ -1,284 +1,344 @@
-# HandoverGuard Backend
+﻿# HandoverGuard
 
-## Project Overview
+**HandoverGuard** is a mobile-first, AI-assisted healthcare handover web
+application built as a hackathon prototype. It helps organize
+information from a clinician-reviewed transcript into structured
+handover categories and provides access to saved handovers.
 
-HandoverGuard is an AI-assisted medical handover organization tool developed as a hackathon prototype.
+> **Clinical safety notice:** HandoverGuard produces unverified drafts,
+> not clinical decisions. Healthcare professionals must review the
+> transcript and generated output. It must not be used as a substitute
+> for clinical judgment.
 
-The system takes a doctor's voice note, converts it into text using a separate speech-to-text component, and organizes the transcript into a structured handover for review by healthcare professionals.
+## Features
 
-This repository contains the backend and AI processing component.
+-   **Manual transcript input:** Submit handover notes for structuring.
+-   **Speech-to-text:** Transcribe supported audio locally using
+    Faster-Whisper.
+-   **AI-assisted structuring:** Organize documented information using
+    Groq.
+-   **Structured handover categories:** Separate completed actions,
+    pending tasks, follow-ups, communication, and unclear or
+    undocumented information.
+-   **Authentication:** Cookie-based login and logout; no public
+    self-registration.
+-   **Saved handovers:** Persist, list, retrieve, and delete handovers
+    belonging to the authenticated user.
+-   **PDF export:** Export saved handovers to PDF from the frontend.
+-   **Responsive interface:** A React/Vite web application designed for
+    desktop and mobile-sized screens.
 
-## My Scope
+## Technology stack
 
-The backend is responsible for:
+-   **Frontend:** React, TypeScript, Vite, Tailwind CSS
+-   **Backend:** Python, FastAPI, Pydantic
+-   **AI provider:** Groq, using `openai/gpt-oss-120b`
+-   **Speech-to-text:** Faster-Whisper, using the `base` model with CPU
+    `int8` computation
+-   **Database:** SQLite
+-   **PDF generation:** jsPDF
+-   **Testing:** pytest
 
-* Accepting a text transcript.
-* Sending the transcript to an LLM API.
-* Extracting information into predefined categories.
-* Validating the AI response.
-* Returning structured JSON to the frontend.
-* Handling invalid input and processing failures.
+## How it works
 
-The backend does not record audio, perform speech-to-text, or implement the frontend dashboard.
+1.  A clinician enters a transcript or records/uploads supported audio.
+2.  If audio is used, the backend transcribes it locally.
+3.  The clinician reviews and corrects the transcript before submitting
+    it for structuring.
+4.  The backend sends the transcript to the AI provider and validates
+    the returned data.
+5.  The application displays the structured handover for professional
+    review.
+6.  Successful handovers are saved in SQLite and can be accessed later
+    by the authenticated owner.
+7.  Saved handovers can be exported as PDFs.
 
-## Technology Stack
+## Handover categories
 
-* Python
-* FastAPI
-* Uvicorn
-* Pydantic
-* Groq via the official `groq` SDK (`openai/gpt-oss-120b`)
-* pytest for automated testing
+The structured response contains six fields:
 
-## Expected Workflow
+  -----------------------------------------------------------------------
+  Field                               Purpose
+  ----------------------------------- -----------------------------------
+  `patient_reference`                 A patient, bed, or other reference
+                                      explicitly documented in the
+                                      transcript; otherwise `null`.
 
-1. A doctor records a voice note.
-2. The speech-to-text component produces a transcript.
-3. The frontend sends the transcript to the backend.
-4. The backend sends the transcript to the LLM.
-5. The response is validated against the expected schema.
-6. The backend returns structured JSON.
-7. The frontend displays the result for human review.
+  `completed`                         Actions explicitly documented as
+                                      completed.
 
-## Handover Categories
+  `pending`                           Documented outstanding tasks,
+                                      results, or actions.
 
-The API response should contain:
+  `follow_up`                         Documented follow-up actions.
 
-* `patient_reference`: A documented patient or bed reference, or null.
-* `completed`: Explicitly documented completed actions.
-* `pending`: Explicitly documented pending tasks or results.
-* `follow_up`: Documented follow-up actions.
-* `communication`: Documented communication with patients, families, or healthcare professionals.
-* `unclear_or_undocumented`: Important ambiguities, contradictions, or explicitly identified documentation gaps.
+  `communication`                     Documented communication with
+                                      patients, families, or healthcare
+                                      professionals.
 
-Missing information must not automatically be interpreted as evidence that an action was not performed.
+  `unclear_or_undocumented`           Important ambiguities,
+                                      contradictions, or information that
+                                      requires verification.
+  -----------------------------------------------------------------------
 
-## API Endpoints
+**Safety rules:**
 
-### GET /health
+-   A task being mentioned does not mean it was completed.
+-   Missing information must not be treated as proof that an action was
+    not performed.
+-   An empty list means that no information was documented in that
+    category, not that there is nothing outstanding.
+-   The AI must not invent facts to fill gaps.
 
-Checks whether the backend is running.
+## API overview
 
-### POST /process-handover
+The backend runs on port `8000`. During local development, the Vite
+server proxies frontend requests from `/api/...` to the corresponding
+backend routes, stripping the `/api` prefix.
 
-Accepts a transcript, sends ONE Groq call with strict schema-constrained JSON output, independently re-validates the result against the six-field schema, and returns the handover draft.
+  ------------------------------------------------------------------------------
+  Method            Backend route            Purpose           Authentication
+  ----------------- ------------------------ ----------------- -----------------
+  `GET`             `/health`                Health check      Not required
 
-Example request:
+  `POST`            `/login`                 Authenticate a    Not required
+                                             provisioned
+                                             account and
+                                             establish a
+                                             session
 
-```
+  `POST`            `/logout`                Revoke the        Session required
+                                             session and clear
+                                             the session
+                                             cookie
+
+  `GET`             `/me`                    Return the        Session required
+                                             current
+                                             authenticated
+                                             user's
+                                             information
+
+  `POST`            `/process-handover`      Validate,         Session required
+                                             process, and save
+                                             a handover
+
+  `POST`            `/transcribe`            Transcribe an     Session required
+                                             uploaded audio
+                                             file
+
+  `GET`             `/handovers`             List the current  Session required
+                                             user's saved
+                                             handovers
+
+  `GET`             `/handovers/{case_id}`   Retrieve a saved  Session required
+                                             handover owned by
+                                             the current user
+
+  `DELETE`          `/handovers/{case_id}`   Delete a saved    Session required
+                                             handover owned by
+                                             the current user
+  ------------------------------------------------------------------------------
+
+### Processing a handover
+
+`POST /process-handover` accepts JSON containing a transcript:
+
+``` json
 {
   "transcript": "Blood test results are pending. Cardiology review tomorrow."
 }
 ```
 
-Example response:
+The successful response contains the six structured handover fields,
+together with saved-record metadata such as `case_id` and `created_at`.
 
-```
+Errors use a consistent structure:
+
+``` json
 {
-  "patient_reference": "Bed 4",
-  "completed": ["Morning medications given"],
-  "pending": ["Blood test results are pending"],
-  "follow_up": ["Cardiology review tomorrow at 10am"],
-  "communication": ["Spoke with the daughter about the plan"],
-  "unclear_or_undocumented": ["Not sure if the evening antibiotics were given"]
+  "error": {
+    "code": "error_code",
+    "message": "Human-readable error message"
+  }
 }
 ```
 
-Error responses always use one shape:
+The backend validates input and AI output. A successful HTTP response
+does not mean the handover is clinically verified.
 
+### Speech-to-text
+
+`POST /transcribe` accepts `multipart/form-data` with the file field
+named `audio`.
+
+-   Successful response: `{"transcript": "recognized text"}`
+-   Supported formats: WAV, MP3, OGG, M4A, WEBM
+-   Maximum audio upload size: 25 MB
+-   Transcription uses Faster-Whisper locally; audio is not sent to an
+    external speech-to-text provider.
+-   The transcript must be reviewed and corrected before it is submitted
+    for AI structuring.
+
+The Whisper model may download on the first transcription request. Warm
+up the model before a live demonstration to reduce first-request delays.
+
+## Authentication and saved data
+
+The current application uses cookie-based authentication. Accounts are
+provisioned by the system administrator; public self-registration is not
+available.
+
+To provision a demo account, use the project's account-provisioning
+script from the repository root:
+
+``` powershell
+python -m tools.provision_demo_account
 ```
-{ "error": { "code": "<machine_code>", "message": "<safe, human-readable>" } }
-```
 
-| Situation | Status | `code` |
-| --- | --- | --- |
-| Empty or whitespace-only transcript | 400 | `invalid_input` |
-| Transcript over `MAX_TRANSCRIPT_CHARS` (default 10000) | 400 | `invalid_input` |
-| Missing `transcript` field, wrong type, or malformed JSON body | 422 | `invalid_request_body` |
-| `GROQ_API_KEY` not configured on the server | 503 | `llm_not_configured` |
-| Provider rejected credentials or quota/rate limit | 503 | `llm_auth_or_quota` |
-| Provider unreachable or failing (after one bounded retry) | 503 | `llm_unavailable` |
-| Overall processing deadline (~30 s) expired | 504 | `processing_timeout` |
-| Provider returned empty/blocked/schema-invalid output | 502 | `llm_invalid_response` |
+Follow the script's prompts or configured inputs. Do not put passwords,
+session cookies, or API keys in this README or commit them to the
+repository.
 
-Error messages never contain the API key or raw provider responses.
+Saved handovers are associated with an owner. The API restricts listing,
+retrieval, and deletion to records owned by the authenticated user.
 
-CORS is enabled only for `FRONTEND_ORIGIN` (default `http://localhost:3000`).
+The current application uses **SQLite** for persistence. Supabase was an
+experimental branch and is not part of the current integrated
+application.
 
-**The output is an unverified draft that requires clinician review.** The extraction prompt forbids inventing facts: a mentioned task is never treated as completed, ambiguous or incomplete medication instructions are flagged in `unclear_or_undocumented` instead of guessed, `patient_reference` stays null unless explicitly stated, and an empty list means "not documented" — never "nothing outstanding". Transcript content is treated as untrusted data, not as instructions.
+## Running locally
 
-## Development Status
+### Prerequisites
 
-The backend will be developed in stages:
+-   A compatible Python version supported by the project dependencies
+-   Node.js and npm
+-   Git
+-   A Groq API key for AI processing
 
-1. Project setup and health endpoint. (complete)
-2. Transcript input and mock response. (complete)
-3. LLM integration (Groq, migrated from Gemini). (complete)
-4. Output validation and error handling. (implemented in Stage 3)
-5. Automated tests.
-6. Frontend integration.
-7. Documentation and final verification.
+### 1. Set up the backend
 
-Features should be marked complete only after implementation and testing.
+From the repository root, open PowerShell:
 
-## Setup
-
-Prerequisites:
-
-* Python 3.11 or a compatible supported version.
-* pip.
-* Git, if collaborating through a Git repository.
-
-Create a virtual environment:
-
-### Windows PowerShell
-
-```
+``` powershell
 py -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-```
-
-Install the project dependencies after `requirements.txt` has been created:
-
-```
 pip install -r requirements.txt
 ```
 
-Start the server after `main.py` has been implemented:
+Create a local `.env` file using `.env.example` as the reference.
+Configure the required Groq API key and any other variables documented
+by the project configuration.
 
-```
-uvicorn main:app --reload
-```
+**Never commit `.env` or expose API keys in frontend code.**
 
-The exact command may change if the project uses a different application entry point.
+Start the backend:
 
-Open the following local URLs:
-
-* API health check: http://127.0.0.1:8000/health
-* Interactive API documentation: http://127.0.0.1:8000/docs
-
-## Environment Variables
-
-Copy `.env.example` to `.env` and add your Groq API key (free key at https://console.groq.com/keys):
-
-```
-GROQ_API_KEY=your-key-here
-LLM_MODEL=openai/gpt-oss-120b
-```
-
-The model must support strict JSON-schema structured outputs — `openai/gpt-oss-120b` and `openai/gpt-oss-20b` do. If the API reports a model is unavailable, update `LLM_MODEL` in both `.env` and `.env.example`.
-
-Never commit `.env` or expose API keys in frontend code.
-
-## Testing
-
-Run automated tests with:
-
-```
-pytest
-```
-
-All automated tests are mocked and make no network calls. The suite includes one opt-in live test against the real Groq API (clearly fictional transcript); it is skipped unless `RUN_LIVE_TESTS=1` is set AND `GROQ_API_KEY` is configured.
-
-## Frontend Integration (Person 1's React app)
-
-The repository now contains both the FastAPI backend (repo root: `main.py`, `app/`) and the React + Vite frontend (repo root: `src/`, `package.json`). npm is the package manager.
-
-### Running both apps (development)
-
-Backend (repo root):
-
-```
+``` powershell
 .venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-Frontend (repo root, second terminal):
+Backend URLs:
 
-```
+-   Health check: `http://127.0.0.1:8000/health`
+-   Interactive API documentation: `http://127.0.0.1:8000/docs`
+
+### 2. Set up the frontend
+
+Open a second PowerShell terminal in the repository root:
+
+``` powershell
 npm install
 npm run dev
 ```
 
-Expected local addresses:
+The Vite development server uses port `3000` with a strict port setting.
 
-* Frontend dashboard: http://localhost:5173
-* Backend API: http://127.0.0.1:8000 (health check at http://127.0.0.1:8000/health; interactive docs at http://127.0.0.1:8000/docs)
+Open `http://localhost:3000`.
 
-### How the frontend reaches the backend
+The frontend uses the Vite `/api` proxy to reach the backend at
+`http://127.0.0.1:8000`. Keep both development servers running while
+using the application.
 
-The frontend calls `/api/process-handover` (same origin). The Vite development
-server (`vite.config.ts`) proxies `/api/*` to `http://127.0.0.1:8000` and strips
-the `/api` prefix, so the backend receives its normal `POST /process-handover`.
-No CORS changes are needed in development. Note: `INTEGRATION_CONTRACT.md`
-describes an older planned contract and is superseded — this section and
-"API Endpoints" above describe the real one.
+### 3. Sign in
 
-### End-to-end test (synthetic data only)
+Use the demo account credentials supplied by the project team or system
+administrator. There is no public sign-up flow.
 
-1. Start both apps as above.
-2. Open http://localhost:5173 and paste a fictional transcript into
-   "Manual Notes / Transcript Backup", e.g.:
-   "Patient 104. Blood pressure was checked at 2 PM and recorded as 120 over 80.
-   Blood test result is still pending. The patient's family asked about the
-   expected discharge time. An ECG was requested, but the note does not confirm
-   whether it was completed."
-3. Click **Generate Handover** — the dashboard should show real AI output:
-   the blood test under Pending, the family question under Communication, and
-   the unconfirmed ECG under Needs Verification (never marked as missed).
+### 4. Prepare a demonstration
 
-Current limitation: **audio recording/upload is not connected to transcription
-yet** (awaiting Person 2's speech-to-text integration). Audio-only submissions
-show an honest error; manual text entry is the working path.
+-   Use fictional or appropriately de-identified patient information.
+-   Review and correct any speech-to-text output.
+-   Check the generated handover before treating it as usable
+    documentation.
+-   Test saved handover retrieval and deletion.
+-   Export a saved handover to PDF and inspect the resulting file before
+    presenting it.
 
-Generated handovers are **unverified drafts that require clinician review**,
-and all demo/testing transcripts must use synthetic patient data only.
+## Testing and build verification
 
-## Speech-to-Text (POST /transcribe)
+Run backend tests:
 
-The backend also runs **local** speech-to-text (faster-whisper, Whisper "base" model, CPU int8 — same configuration as Person 2's transcription work). No audio is sent to any external service.
-
-```
-POST /transcribe   (multipart/form-data, field "audio")
+``` powershell
+.venv\Scripts\python.exe -m pytest -q
 ```
 
-* Success: `200 {"transcript": "recognized text"}`.
-* Supported formats: WAV, MP3, OGG, M4A, WEBM — validated by file-content signature; filename and declared MIME type are not trusted.
-* Limits: max 25 MB (`MAX_AUDIO_MB`), enforced while streaming; uploads are written to a temporary file outside the repository and deleted on every request path — except that a timed-out transcription, whose worker thread continues server-side, deletes its own file when it eventually finishes (on Windows the file cannot be removed while the decoder still holds it open).
-* Errors: `audio_invalid` / `audio_too_large` (400), `stt_model_error` (503), `stt_busy` (503 — bounded concurrent jobs), `stt_timeout` (504).
+Build the frontend:
 
-### First-run model download and demo preparation
-
-The ~150 MB Whisper model downloads automatically on the **first** `/transcribe` request. To avoid a delay during a demo, warm it up once beforehand:
-
-```
-.venv\Scripts\python.exe -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='int8')"
+``` powershell
+npm.cmd run build
 ```
 
-Expected CPU latency is roughly real-time (a 60-second note takes about 30–90 seconds to transcribe). Keep demo recordings short.
+The latest recorded backend test run shared by the team reported **78
+passed, 1 skipped**. This is a historical result; rerun the tests after
+subsequent changes.
 
-### Important limitation
+The frontend build has also succeeded in the latest shared integration
+workflow. A successful build verifies compilation and bundling, not
+every runtime feature.
 
-**Transcription is not guaranteed accurate.** The returned transcript must be reviewed and edited by a clinician in the frontend before clicking Generate — only the reviewed text is sent to `/process-handover`. A transcription timeout bounds the API response but does not cancel the CPU work server-side (documented behaviour).
+## Safety, privacy, and limitations
 
-## Safety and Limitations
+-   HandoverGuard is a prototype for organizing documented information,
+    not a diagnostic or treatment system.
+-   AI-generated content must be reviewed by a qualified healthcare
+    professional.
+-   Speech recognition may be inaccurate; review the transcript before
+    processing it.
+-   The application must not invent medical facts, diagnoses,
+    medications, dosages, or treatment instructions.
+-   Use synthetic or properly de-identified data for development and
+    demonstrations.
+-   Do not use real patient information without appropriate
+    authorization and safeguards.
+-   Local development and successful tests do not establish that the
+    application is production-ready or compliant with healthcare privacy
+    requirements.
 
-HandoverGuard is a prototype for organizing documented information. It is not a diagnostic system and must not replace clinical judgment or professional verification.
+## Deployment status
 
-The system must not invent medical facts, diagnoses, medications, dosages, or treatment instructions.
+**Not deployed.** The team plans to deploy after the frontend has been
+finalized and the integrated application is ready.
 
-Ambiguous information should be flagged for human review.
+## Team contributions
 
-Use fictional or properly de-identified transcripts for development and demonstrations. Do not use real patient information without appropriate authorization and safeguards.
+The following summary reflects the team's reported responsibilities; it
+is not inferred solely from Git commit authorship.
 
-## Team Integration
+-   **Person 1:** Frontend and dashboard work.
+-   **Person 2:** Speech-to-text integration and SQLite database
+    implementation.
+-   **Person 3:** Backend, AI processing, integration, authentication,
+    and related application work.
+-   **Person 4:** Planned assistance with UI work and the demonstration.
+    Additional completed contributions should be documented once
+    confirmed.
 
-Person 1: Frontend and dashboard.
+## Project status
 
-Person 2: Audio processing and speech-to-text.
+The current integration includes a responsive React/Vite interface, a
+FastAPI backend, local speech-to-text, AI-assisted handover structuring,
+SQLite persistence, cookie-based authentication, owner-scoped saved
+handovers, deletion, and frontend PDF export.
 
-Person 3: Backend and AI processing.
-
-Person 4: Sample transcripts, testing, and demonstration support.
-
-The API request and response schemas must be agreed upon before frontend integration.
+The project remains a hackathon prototype and is not yet deployed.
