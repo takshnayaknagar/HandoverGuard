@@ -14,7 +14,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
     <div className="rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] p-5 text-center transition-colors duration-200 sm:p-8 flex flex-col items-center justify-center">
       <div className="relative mb-4">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card-muted)]">
-          <Loader2 className="w-7 h-7 text-[#315f9f] dark:text-[#8AB4FF] animate-spin" />
+          <Loader2 className="w-7 h-7 text-[#4ea899] dark:text-[#86d2c1] animate-spin" />
         </div>
       </div>
 
@@ -28,14 +28,14 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
       {progressPercent !== undefined && (
         <div className="w-full max-w-xs bg-[var(--bg-card-muted)] h-2 rounded-full overflow-hidden mb-2">
           <div
-            className="bg-[#315f9f] dark:bg-[#8AB4FF] h-full transition-all duration-300"
+            className="bg-[#4ea899] dark:bg-[#86d2c1] h-full transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
       )}
 
       <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] font-medium">
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#315f9f] dark:bg-[#8AB4FF] animate-ping" />
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#4ea899] dark:bg-[#86d2c1] animate-ping" />
         Filtering medical terms & running safety validation
       </div>
     </div>

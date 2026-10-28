@@ -66,18 +66,18 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
           tabIndex={disabled ? -1 : 0}
           aria-label="Choose an audio file to upload"
           aria-disabled={disabled}
-          className={`min-h-40 border border-dashed rounded-xl p-5 sm:p-6 flex flex-col items-center justify-center gap-3 transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] ${
+          className={`min-h-40 border border-dashed rounded-xl p-5 sm:p-6 flex flex-col items-center justify-center gap-3 transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1] ${
             disabled
               ? 'opacity-50 cursor-not-allowed border-[var(--border-main)] bg-[var(--bg-card-muted)]'
-              : 'border-[var(--border-main)] hover:border-[#315f9f] dark:hover:border-[#8AB4FF] hover:bg-[var(--bg-card-muted)] cursor-pointer bg-[var(--bg-input)]'
+              : 'border-[var(--border-main)] hover:border-[#4ea899] dark:hover:border-[#86d2c1] hover:bg-[var(--bg-card-muted)] cursor-pointer bg-[var(--bg-input)]'
           }`}
         >
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] text-[#315f9f] dark:text-[#8AB4FF]">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] text-[#4ea899] dark:text-[#86d2c1]">
             <Upload className="w-6 h-6" />
           </div>
           <div>
             <p className="text-sm font-medium leading-relaxed text-[var(--text-primary)]">
-              Drag & drop audio note, or <span className="font-semibold text-[#315f9f] underline dark:text-[#8AB4FF]">browse</span>
+              Drag & drop audio note, or <span className="font-semibold text-[#4ea899] underline dark:text-[#86d2c1]">browse</span>
             </p>
             <p className="text-xs text-[var(--text-muted)] mt-1">Supports audio files up to 25MB</p>
           </div>
@@ -85,7 +85,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
       ) : (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] p-4">
           <div className="flex items-center gap-3 truncate">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#315f9f] text-white dark:bg-[#8AB4FF] dark:text-[#050505]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#4ea899] text-white dark:bg-[#86d2c1] dark:text-[#050505]">
               <FileAudio className="w-5 h-5" />
             </div>
             <div className="truncate">

@@ -18,7 +18,7 @@ export const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, title = '
           <div className="min-w-0">
             <div className="min-w-0">
               <span className="font-bold text-lg sm:text-xl tracking-tight text-[var(--text-primary)]">
-                Handover<span className="text-[#315f9f] dark:text-[#8AB4FF]">Guard</span>
+                Handover<span className="text-[#4ea899] dark:text-[#86d2c1]">Guard</span>
               </span>
               <span className="ml-2 text-xs font-semibold text-[var(--text-muted)]">{title}</span>
             </div>
@@ -32,17 +32,17 @@ export const Header: React.FC<HeaderProps> = ({ isDark, onToggleTheme, title = '
           type="button"
           onClick={onToggleTheme}
           aria-label="Toggle dark and light mode"
-          className="min-h-10 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] text-[var(--text-secondary)] transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+          className="min-h-10 flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] text-[var(--text-secondary)] transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1]"
           title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {isDark ? (
             <>
-              <Sun className="w-4 h-4 text-[#8AB4FF]" />
+              <Sun className="w-4 h-4 text-[#86d2c1]" />
               <span className="text-xs font-medium hidden sm:inline">Light</span>
             </>
           ) : (
             <>
-              <Moon className="w-4 h-4 text-[#315f9f] dark:text-[#8AB4FF]" />
+              <Moon className="w-4 h-4 text-[#4ea899] dark:text-[#86d2c1]" />
               <span className="text-xs font-medium hidden sm:inline">Dark</span>
             </>
           )}

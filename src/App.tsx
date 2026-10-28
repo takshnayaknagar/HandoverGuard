@@ -421,7 +421,7 @@ export const App: React.FC = () => {
       />
       )}
         {!isAuthChecking && currentUser && authMessage && <div role="alert" className="mx-auto w-full max-w-3xl rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-3 text-sm text-[var(--text-primary)]">{authMessage}</div>}
-        {!isAuthChecking && currentUser && <div className="flex justify-end"><button type="button" onClick={handleLogout} className="min-h-10 rounded-xl border border-[var(--border-main)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">Sign out</button></div>}
+        {!isAuthChecking && currentUser && <div className="flex justify-end"><button type="button" onClick={handleLogout} className="min-h-10 rounded-xl border border-[var(--border-main)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1]">Sign out</button></div>}
 
         {currentUser && activeScreen === 'input' && <div className="mx-auto flex w-full max-w-md items-center justify-between rounded-xl border border-[#eceef0] bg-[var(--bg-card-muted)] p-3 shadow-sm dark:border-[var(--border-main)]">
           <div className="flex min-w-0 items-center gap-3">
@@ -447,7 +447,7 @@ export const App: React.FC = () => {
               </p>
             </div>
             {hasAnyInput && (
-              <span className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-2.5 py-1 text-xs font-semibold text-[#315f9f] dark:text-[#8AB4FF]">
+              <span className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-2.5 py-1 text-xs font-semibold text-[#4ea899] dark:text-[#86d2c1]">
                 Input Selected
               </span>
             )}
@@ -485,7 +485,7 @@ export const App: React.FC = () => {
           {/* Source-style primary action footer, backed by the real target handlers. */}
           <div className="sticky bottom-20 z-20 mt-2 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)]/95 p-3 shadow-lg backdrop-blur-md">
             <div className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[#315f9f] dark:bg-[#8AB4FF]" />
+              <span className="h-2 w-2 rounded-full bg-[#4ea899] dark:bg-[#86d2c1]" />
               <span>
                 {isTranscribing
                   ? 'Transcribing audio...'
@@ -512,7 +512,7 @@ export const App: React.FC = () => {
                 type="button"
                 onClick={handleGenerateHandover}
                 disabled={isProcessing || isTranscribing || !manualNotes.trim()}
-                className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#315f9f] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#244a80] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#8AB4FF] dark:text-[#050505] dark:hover:bg-[#a9c8ff]"
+                className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#4ea899] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#3d8a7c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#86d2c1] dark:text-[#050505] dark:hover:bg-[#9ed8cb]"
               >
                 <Sparkles className="w-4 h-4 text-[#edae49]" />
                 <span>Generate Handover</span>
@@ -542,7 +542,7 @@ export const App: React.FC = () => {
           <section className="mx-auto flex w-full max-w-md flex-col gap-5 pb-28 animate-fade-in scroll-mt-24 xl:max-w-7xl">
             <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] text-[#315f9f] dark:text-[#8AB4FF]"><FileText className="h-5 w-5" /></div>
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] text-[#4ea899] dark:text-[#86d2c1]"><FileText className="h-5 w-5" /></div>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-base font-bold text-[var(--text-primary)]">Current Handover</span>
@@ -588,7 +588,7 @@ export const App: React.FC = () => {
                   onClick={handleCopySummary}
                   className="flex min-h-10 flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer sm:flex-none"
                 >
-                  <Copy className="w-3.5 h-3.5 text-[#315f9f] dark:text-[#8AB4FF]" />
+                  <Copy className="w-3.5 h-3.5 text-[#4ea899] dark:text-[#86d2c1]" />
                   <span>{copied ? 'Copied!' : 'Copy Summary'}</span>
                 </button>
 
@@ -606,7 +606,7 @@ export const App: React.FC = () => {
                   onClick={handleExportJson}
                   className="flex min-h-10 flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer sm:flex-none"
                 >
-                  <Download className="w-3.5 h-3.5 text-[#315f9f] dark:text-[#8AB4FF]" />
+                  <Download className="w-3.5 h-3.5 text-[#4ea899] dark:text-[#86d2c1]" />
                   <span>Export JSON</span>
                 </button>
 
@@ -636,7 +636,7 @@ export const App: React.FC = () => {
               </div>
             </div>
 
-            <button type="button" onClick={() => setActiveScreen('input')} className="self-start text-xs font-semibold text-[#315f9f] underline-offset-2 hover:underline dark:text-[#8AB4FF]">
+            <button type="button" onClick={() => setActiveScreen('input')} className="self-start text-xs font-semibold text-[#4ea899] underline-offset-2 hover:underline dark:text-[#86d2c1]">
               ← Back to Voice Note
             </button>
 
@@ -644,7 +644,7 @@ export const App: React.FC = () => {
             <div className="bg-[var(--bg-card-muted)] rounded-2xl p-4 sm:p-5 border border-[var(--border-main)]">
               <div className="flex flex-col items-start gap-2 mb-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-[#315f9f] dark:text-[#8AB4FF]" />
+                  <FileText className="w-3.5 h-3.5 text-[#4ea899] dark:text-[#86d2c1]" />
                   Raw Transcript Preview
                 </span>
                 <span className="text-[11px] text-[var(--text-muted)] font-mono">
@@ -670,7 +670,7 @@ export const App: React.FC = () => {
           <button
             type="button"
             onClick={handleOpenSavedModal}
-            className="mt-3 min-h-11 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+            className="mt-3 min-h-11 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1]"
             >
             View Saved Handovers
           </button>
@@ -685,8 +685,8 @@ export const App: React.FC = () => {
             </div>
             {handoverResult ? (
               <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-5 sm:flex-row">
-                <button type="button" onClick={handleExportJson} className="min-h-11 flex-1 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">Export JSON</button>
-                <button type="button" onClick={handleExportPdf} disabled={isExportingPdf} className="min-h-11 flex-1 rounded-xl bg-[#315f9f] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244a80] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">{isExportingPdf ? 'Exporting PDF...' : pdfExported ? 'PDF Downloaded!' : 'Export PDF'}</button>
+                <button type="button" onClick={handleExportJson} className="min-h-11 flex-1 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1]">Export JSON</button>
+                <button type="button" onClick={handleExportPdf} disabled={isExportingPdf} className="min-h-11 flex-1 rounded-xl bg-[#4ea899] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#3d8a7c] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1]">{isExportingPdf ? 'Exporting PDF...' : pdfExported ? 'PDF Downloaded!' : 'Export PDF'}</button>
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-[var(--border-main)] bg-[var(--bg-card-muted)] p-8 text-center text-sm text-[var(--text-secondary)]">No current handover is available to export. Process or load a handover first.</div>
@@ -736,7 +736,7 @@ export const App: React.FC = () => {
                             type="button"
                             onClick={() => handleExportSavedPdf(item.case_id)}
                             disabled={exportingSavedAction !== null}
-                            className="min-h-10 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+                            className="min-h-10 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1]"
                           >
                             {exportingSavedAction === pdfKey ? 'Exporting...' : 'Export PDF'}
                           </button>
@@ -744,7 +744,7 @@ export const App: React.FC = () => {
                             type="button"
                             onClick={() => handleExportSavedJson(item.case_id)}
                             disabled={exportingSavedAction !== null}
-                            className="min-h-10 rounded-lg bg-[#315f9f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#244a80] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+                            className="min-h-10 rounded-lg bg-[#4ea899] px-3 py-2 text-xs font-semibold text-white hover:bg-[#3d8a7c] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1]"
                           >
                             {exportingSavedAction === jsonKey ? 'Exporting...' : 'Export JSON'}
                           </button>

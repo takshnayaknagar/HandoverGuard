@@ -152,7 +152,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               onClick={startRecording}
               disabled={disabled}
               aria-label="Start voice recording"
-              className="flex h-28 w-28 flex-col items-center justify-center gap-2 rounded-full bg-[#DC3535] px-3 py-3.5 font-medium text-white transition-colors hover:bg-[#B82B2B] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+              className="flex h-28 w-28 flex-col items-center justify-center gap-2 rounded-full bg-[#DC3535] px-3 py-3.5 font-medium text-white transition-colors hover:bg-[#B82B2B] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1]"
             >
               <Mic className="h-8 w-8 text-white" />
               <span className="text-xs font-bold tracking-[0.16em]">RECORD</span>
@@ -162,7 +162,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               type="button"
               onClick={stopRecording}
               aria-label="Stop voice recording"
-              className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-4 py-3.5 text-center font-medium text-white transition-colors hover:bg-[#292929] sm:w-auto sm:min-w-56 cursor-pointer animate-pulse touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"            >
+              className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-4 py-3.5 text-center font-medium text-white transition-colors hover:bg-[#292929] sm:w-auto sm:min-w-56 cursor-pointer animate-pulse touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1]"            >
               <Square className="w-5 h-5 text-[#edae49] fill-[#edae49]" />
               <span>Stop Recording ({formatTime(recordingDuration)})</span>
             </button>
@@ -175,7 +175,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
                 type="button"
                 onClick={togglePlayback}
                 aria-label={isPlaying ? 'Pause recorded audio' : 'Play recorded audio'}
-              className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#315f9f] text-white transition-colors hover:bg-[#244a80] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+              className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4ea899] text-white transition-colors hover:bg-[#3d8a7c] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#86d2c1]"
               >
                 {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
               </button>

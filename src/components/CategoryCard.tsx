@@ -36,7 +36,7 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({
       case 'high':
         return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">High</span>;
       case 'medium':
-        return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#315f9f]/10 text-[#315f9f] dark:text-[#8AB4FF] border border-[#315f9f]/25">Medium</span>;
+        return <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#4ea899]/10 text-[#4ea899] dark:text-[#86d2c1] border border-[#4ea899]/25">Medium</span>;
       default:
         return null;
     }
@@ -67,7 +67,7 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({
           items.map((item) => (
             <div key={item.id} className="pt-3 first:pt-0 group">
               <div className="flex items-start justify-between gap-2">
-                <h4 className="break-words text-sm font-semibold text-[var(--text-primary)] transition-colors group-hover:text-[#315f9f] dark:group-hover:text-[#8AB4FF]">
+                <h4 className="break-words text-sm font-semibold text-[var(--text-primary)] transition-colors group-hover:text-[#4ea899] dark:group-hover:text-[#86d2c1]">
                   {item.title}
                 </h4>
                 {getUrgencyBadge(item.urgency)}
@@ -118,10 +118,10 @@ export const HandoverDashboardCards: React.FC<{ items: {
         category="followup"
         title="Follow-up"
         items={items.followup}
-        icon={<ArrowRightCircle className="w-5 h-5 text-[#315f9f] dark:text-[#8AB4FF]" />}
-        badgeStyle="bg-[#315f9f]/10 text-[#315f9f] dark:text-[#8AB4FF]"
-        cardBorderStyle="border-[#315f9f]/25"
-        headerBgStyle="bg-[#315f9f]/5 border-[#315f9f]/15"
+        icon={<ArrowRightCircle className="w-5 h-5 text-[#4ea899] dark:text-[#86d2c1]" />}
+        badgeStyle="bg-[#4ea899]/10 text-[#4ea899] dark:text-[#86d2c1]"
+        cardBorderStyle="border-[#4ea899]/25"
+        headerBgStyle="bg-[#4ea899]/5 border-[#4ea899]/15"
       />
 
       {/* Completed */}
@@ -160,7 +160,7 @@ export const HandoverDashboardCards: React.FC<{ items: {
       {/* AI output review reminder */}
       <div className="rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card-muted)] p-5 text-[var(--text-primary)] md:col-span-2">
         <div className="flex items-center gap-2 mb-3">
-          <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-2 text-[#315f9f] dark:text-[#8AB4FF]">
+          <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-2 text-[#4ea899] dark:text-[#86d2c1]">
             <AlertCircle className="w-5 h-5" />
           </div>
           <h3 className="font-semibold text-base text-[var(--text-primary)]">Review AI-Generated Items</h3>
