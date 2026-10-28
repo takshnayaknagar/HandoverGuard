@@ -57,14 +57,6 @@ export const SAMPLE_HANDOVER_OUTPUT: HandoverOutput = {
         patient: "Demo Bed 12",
         urgency: "low"
       },
-      {
-        id: "c-2",
-        category: "completed",
-        title: "Handover communication recorded",
-        description: "The demo illustrates recording a completed communication task. Verify completion from actual notes in real use.",
-        patient: "Demo Bed 14",
-        urgency: "low"
-      }
     ],
     communication: [
       {
@@ -72,6 +64,14 @@ export const SAMPLE_HANDOVER_OUTPUT: HandoverOutput = {
         category: "communication",
         title: "Discharge plan enquiry",
         description: "A family member asked about the expected discharge plan. An update is to be provided after the next review.",
+        patient: "Demo Bed 14",
+        urgency: "low"
+      },
+      {
+        id: "c-2",
+        category: "communication",
+        title: "Handover communication recorded",
+        description: "The fictional demo notes record a family communication request and a planned follow-up update; completion is not established.",
         patient: "Demo Bed 14",
         urgency: "low"
       },
