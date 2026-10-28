@@ -1,18 +1,20 @@
 import React, { useRef } from 'react';
-import { Upload, FileAudio, X } from 'lucide-react';
+import { FileAudio, X } from 'lucide-react';
 
 interface FileUploaderProps {
   onFileSelected: (file: File) => void;
   selectedFile: File | null;
   onClearFile: () => void;
   disabled?: boolean;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 export const FileUploader: React.FC<FileUploaderProps> = ({
   onFileSelected,
   selectedFile,
   onClearFile,
-  disabled = false
+  disabled = false,
+  inputRef
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -31,14 +33,17 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
   };
 
   return (
-    <div className="rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] p-4 transition-colors duration-200 sm:p-5">
-      <div className="flex flex-col items-start gap-1 mb-4 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="font-semibold text-[var(--text-primary)] text-base">Upload Prerecorded Audio</h3>
-        <span className="text-xs text-[var(--text-muted)]">MP3, WAV, M4A, WEBM, OGG</span>
-      </div>
+    <div
+      className="w-full"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        if (event.dataTransfer.files?.[0] && !disabled) onFileSelected(event.dataTransfer.files[0]);
+      }}
+    >
 
       <input
-        ref={fileInputRef}
+        ref={inputRef ?? fileInputRef}
         type="file"
         accept="audio/*,.mp3,.wav,.m4a,.webm,.ogg"
         onChange={handleFileChange}
@@ -47,41 +52,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
       />
 
       {!selectedFile ? (
-        <div
-          onClick={() => !disabled && fileInputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (!disabled && (e.key === 'Enter' || e.key === ' ')) {
-              e.preventDefault();
-              fileInputRef.current?.click();
-            }
-          }}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            if (e.dataTransfer.files && e.dataTransfer.files[0] && !disabled) {
-              onFileSelected(e.dataTransfer.files[0]);
-            }
-          }}
-          role="button"
-          tabIndex={disabled ? -1 : 0}
-          aria-label="Choose an audio file to upload"
-          aria-disabled={disabled}
-          className={`min-h-40 border border-dashed rounded-xl p-5 sm:p-6 flex flex-col items-center justify-center gap-3 transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] ${
-            disabled
-              ? 'opacity-50 cursor-not-allowed border-[var(--border-main)] bg-[var(--bg-card-muted)]'
-              : 'border-[var(--border-main)] hover:border-[#315f9f] dark:hover:border-[#8AB4FF] hover:bg-[var(--bg-card-muted)] cursor-pointer bg-[var(--bg-input)]'
-          }`}
-        >
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] text-[#315f9f] dark:text-[#8AB4FF]">
-            <Upload className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-sm font-medium leading-relaxed text-[var(--text-primary)]">
-              Drag & drop audio note, or <span className="font-semibold text-[#315f9f] underline dark:text-[#8AB4FF]">browse</span>
-            </p>
-            <p className="text-xs text-[var(--text-muted)] mt-1">Supports audio files up to 25MB</p>
-          </div>
-        </div>
+        <div className="hidden" aria-hidden="true" />
       ) : (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] p-4">
           <div className="flex items-center gap-3 truncate">

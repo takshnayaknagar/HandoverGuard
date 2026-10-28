@@ -22,6 +22,7 @@ export interface HandoverOutput {
   timestamp: string;
   caseId?: string;
   patientReference?: string | null;
+  patientBed?: string | null;
   createdAt?: string;
   summary: HandoverSummary;
   items: {

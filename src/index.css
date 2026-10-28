@@ -16,15 +16,28 @@
     --color-navy: #111111;
 
     /* Theme tokens - Light mode default */
-    --bg-main: #f6f6f4;
+    --bg-main: #eef1f4;
     --bg-card: #ffffff;
-    --bg-card-muted: #f0f0ed;
-    --bg-input: #fbfbfa;
-    --border-main: #deded9;
-    --border-card: #d4d4cf;
-    --text-primary: #111111;
-    --text-secondary: #555555;
-    --text-muted: #777777;
+    --bg-card-muted: #f4f6f8;
+    --bg-input: #f8fafb;
+    --border-main: #d9dfe4;
+    --border-card: #cbd3da;
+    --text-primary: #191c1e;
+    --text-secondary: #45464d;
+    --text-muted: #76777d;
+    --nav-bg: rgba(255, 255, 255, 0.92);
+  }
+
+  html:not(.dark) {
+    --bg-main: #eef1f4;
+    --bg-card: #ffffff;
+    --bg-card-muted: #f4f6f8;
+    --bg-input: #f8fafb;
+    --border-main: #d9dfe4;
+    --border-card: #cbd3da;
+    --text-primary: #191c1e;
+    --text-secondary: #45464d;
+    --text-muted: #76777d;
     --nav-bg: rgba(255, 255, 255, 0.92);
   }
 

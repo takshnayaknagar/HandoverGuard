@@ -9,7 +9,8 @@ import { LoadingState, ErrorState } from './components/StatusStates';
 import { SavedHandoversModal } from './components/SavedHandoversModal';
 import { LoginScreen } from './components/screens/LoginScreen';
 import type { HandoverOutput } from './types/handover';
-import { SAMPLE_HANDOVER_OUTPUT } from './data/sampleData';
+import { SAMPLE_HANDOVERS } from './data/sampleData';
+import { formatBedLabel, getBedIdentifier } from './utils/displayFormatters';
 import {
   generateHandover,
   transcribeAudio,
@@ -24,13 +25,14 @@ import {
 } from './services/handoverApi';
 import { 
   Sparkles, 
+  ArrowLeft,
+  Check,
+  ChevronDown,
   FileText, 
-  Copy, 
-  Download, 
-  FileDown,
-  RotateCcw,
+  Download,
+  Trash2,
   Stethoscope,
-  Database
+  FileDown,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -38,6 +40,7 @@ export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [isSignOutConfirmOpen, setIsSignOutConfirmOpen] = useState(false);
   // Theme state: default to dark if preferred or stored in localStorage
   const [isDark, setIsDark] = useState<boolean>(() => {
     const saved = localStorage.getItem('handoverguard-theme');
@@ -114,13 +117,67 @@ export const App: React.FC = () => {
   const [_recordedUrl, setRecordedUrl] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [manualNotes, setManualNotes] = useState<string>('');
+  const [patientBed, setPatientBed] = useState('');
+  const [savedSort, setSavedSort] = useState<'newest' | 'patient' | 'bed'>('newest');
+  const [isSavedSortOpen, setIsSavedSortOpen] = useState(false);
+  const [pendingDeleteCaseId, setPendingDeleteCaseId] = useState<string | null>(null);
+  const [isDeletingCase, setIsDeletingCase] = useState(false);
+  const [isTranscriptVisible, setIsTranscriptVisible] = useState(false);
+  const audioInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [exportMenuCaseId, setExportMenuCaseId] = useState<string | null>(null);
+  const [isCurrentExportMenuOpen, setIsCurrentExportMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isSavedSortOpen) return;
+    const closeMenu = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('[data-saved-sort-menu]')) setIsSavedSortOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsSavedSortOpen(false);
+    };
+    document.addEventListener('mousedown', closeMenu);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeMenu);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [isSavedSortOpen]);
+
+  useEffect(() => {
+    if (!pendingDeleteCaseId) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isDeletingCase) setPendingDeleteCaseId(null);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [pendingDeleteCaseId, isDeletingCase]);
+
+  useEffect(() => {
+    if (!exportMenuCaseId) return;
+    const closeMenu = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (!target.closest('[data-export-menu]')) {
+        setExportMenuCaseId(null);
+        setIsCurrentExportMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setExportMenuCaseId(null);
+    };
+    document.addEventListener('mousedown', closeMenu);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeMenu);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [exportMenuCaseId]);
 
   // Processing & Output states
   const [isProcessing, setIsProcessing] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [handoverResult, setHandoverResult] = useState<HandoverOutput | null>(null);
-  const [copied, setCopied] = useState(false);
 
   // PDF Export states
   const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -142,17 +199,23 @@ export const App: React.FC = () => {
     setRecordedBlob(blob);
     setRecordedUrl(url);
     setUploadedFile(null);
+    setManualNotes('');
+    setIsTranscriptVisible(false);
   };
 
   const handleClearAudio = () => {
     setRecordedBlob(null);
     setRecordedUrl(null);
+    setManualNotes('');
+    setIsTranscriptVisible(false);
   };
 
   // Upload handler
   const handleFileSelected = (file: File) => {
     setUploadedFile(file);
     setRecordedBlob(null);
+    setManualNotes('');
+    setIsTranscriptVisible(false);
     setRecordedUrl(null);
   };
 
@@ -162,8 +225,13 @@ export const App: React.FC = () => {
 
   // Sample quick-loader
   const handleLoadSampleNotes = () => {
-    setManualNotes(SAMPLE_HANDOVER_OUTPUT.rawTranscript);
-  };
+  const randomIndex = Math.floor(Math.random() * SAMPLE_HANDOVERS.length);
+  const sample = SAMPLE_HANDOVERS[randomIndex];
+
+  setManualNotes(sample.rawTranscript);
+  setPatientBed(sample.patientBed ?? '');
+  setIsTranscriptVisible(true);
+};
 
   // Saved handovers handlers
   const handleOpenSavedModal = async () => {
@@ -185,11 +253,15 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeScreen !== 'export') return;
+    if (activeScreen !== 'export' && activeScreen !== 'dashboard') return;
 
     let cancelled = false;
     setIsLoadingSaved(true);
-    setExportScreenError(null);
+    if (activeScreen === 'dashboard') {
+      setSavedListError(null);
+    } else {
+      setExportScreenError(null);
+    }
 
     fetchSavedHandovers()
       .then((list) => {
@@ -197,9 +269,12 @@ export const App: React.FC = () => {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setExportScreenError(
-            err instanceof Error ? err.message : 'Could not fetch saved handovers from the database.'
-          );
+          const message = err instanceof Error ? err.message : 'Could not fetch saved handovers from the database.';
+          if (activeScreen === 'dashboard') {
+            setSavedListError(message);
+          } else {
+            setExportScreenError(message);
+          }
         }
       })
       .finally(() => {
@@ -211,27 +286,43 @@ export const App: React.FC = () => {
     };
   }, [activeScreen]);
 
-  const handleDeleteSavedCase = async (caseId: string) => {
-  const confirmed = window.confirm(
-    `Delete saved handover "${caseId}"? This action cannot be undone.`
-  );
-
-  if (!confirmed) return;
-
+  const handleDeleteSavedCase = async (caseId: string): Promise<boolean> => {
   setSavedListError(null);
 
   try {
     await deleteSavedHandover(caseId);
     const list = await fetchSavedHandovers();
     setSavedList(list);
+    return true;
   } catch (err: unknown) {
     setSavedListError(
       err instanceof Error
         ? err.message
         : 'Failed to delete the saved handover.'
     );
+    return false;
   }
 };
+
+  const requestDeleteSavedCase = (caseId: string) => setPendingDeleteCaseId(caseId);
+
+  const confirmDeleteSavedCase = async () => {
+    if (!pendingDeleteCaseId || isDeletingCase) return;
+    const caseId = pendingDeleteCaseId;
+    setIsDeletingCase(true);
+    const deleted = await handleDeleteSavedCase(caseId);
+    setIsDeletingCase(false);
+    if (deleted && handoverResult?.caseId === caseId) {
+      setHandoverResult(null);
+      setActiveScreen('dashboard');
+    }
+    if (deleted) setPendingDeleteCaseId(null);
+  };
+
+  const handleDeleteCurrentHandover = async () => {
+    if (!handoverResult?.caseId) return;
+    requestDeleteSavedCase(handoverResult.caseId);
+  };
 
   const handleLoadSavedCase = async (caseId: string) => {
     setIsProcessing(true);
@@ -242,6 +333,7 @@ export const App: React.FC = () => {
       const loaded = await fetchSavedHandoverById(caseId);
       setHandoverResult(loaded);
       setManualNotes(loaded.rawTranscript || '');
+      setIsTranscriptVisible(true);
       setActiveScreen('dashboard');
     } catch (err: unknown) {
       setErrorMessage(
@@ -309,6 +401,15 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleSavedExportChoice = (caseId: string, format: 'pdf' | 'json') => {
+    setExportMenuCaseId(null);
+    if (format === 'pdf') {
+      void handleExportSavedPdf(caseId);
+    } else {
+      void handleExportSavedJson(caseId);
+    }
+  };
+
   // Explicitly transcribe selected audio; the clinician reviews the result before generation.
   const handleTranscribeAudio = async () => {
     const audio = uploadedFile ?? recordedBlob;
@@ -324,6 +425,7 @@ export const App: React.FC = () => {
     try {
       const transcript = await transcribeAudio(audio);
       setManualNotes(transcript);
+      setIsTranscriptVisible(true);
       setHandoverResult(null);
     } catch (err: unknown) {
       setErrorMessage(
@@ -347,8 +449,10 @@ export const App: React.FC = () => {
         );
       }
 
-      const result = await generateHandover({ rawText: reviewedNotes });
+      const result = await generateHandover({ rawText: reviewedNotes, patientBed });
       setHandoverResult(result);
+      setManualNotes('');
+      setIsTranscriptVisible(false);
       setActiveScreen('dashboard');
     } catch (err: unknown) {
       setErrorMessage(
@@ -357,15 +461,6 @@ export const App: React.FC = () => {
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const handleCopySummary = () => {
-    if (!handoverResult) return;
-    const textToCopy = `Shift Handover: ${handoverResult.shift}\nTime: ${handoverResult.timestamp}\n\nPENDING:\n${handoverResult.items.pending.map((i) => `- ${i.title} (${i.patient || 'General'})`).join('\n')}\n\nFOLLOW-UP:\n${handoverResult.items.followup.map((i) => `- ${i.title} (${i.patient || 'General'})`).join('\n')}\n\nCOMPLETED:\n${handoverResult.items.completed.map((i) => `- ${i.title}`).join('\n')}\n\nCOMMUNICATION:\n${handoverResult.items.communication.map((i) => `- ${i.title}`).join('\n')}\n\nNEEDS VERIFICATION:\n${handoverResult.items.verification.map((i) => `- ${i.title}`).join('\n')}`;
-
-    navigator.clipboard.writeText(textToCopy);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleExportJson = () => {
@@ -403,15 +498,16 @@ export const App: React.FC = () => {
   const hasAnyInput = Boolean(recordedBlob || uploadedFile || manualNotes.trim().length > 0);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-main)] text-[var(--text-primary)] flex justify-center font-sans transition-colors duration-200">
-      <div className="relative flex min-h-screen w-full max-w-[440px] flex-col overflow-hidden border-[var(--border-main)] bg-[var(--bg-main)] shadow-2xl sm:my-3 sm:min-h-[calc(100vh-24px)] sm:rounded-[28px] sm:border lg:my-0 lg:max-w-[1440px] lg:rounded-none lg:border-0 lg:shadow-none">
-      <Header
+    <div className="min-h-screen bg-[var(--bg-main)] px-0 text-[var(--text-primary)] flex justify-center font-sans transition-colors duration-200 sm:px-3">
+      <div className="relative flex min-h-screen w-full max-w-[440px] flex-col overflow-hidden border-[var(--border-main)] bg-[var(--bg-main)] shadow-2xl sm:my-3 sm:min-h-[calc(100vh-24px)] sm:rounded-[36px] sm:border lg:my-0 lg:max-w-[1440px] lg:rounded-none lg:border-0 lg:shadow-none">
+      {currentUser && <Header
         isDark={isDark}
         onToggleTheme={toggleTheme}
+        onRequestSignOut={() => setIsSignOutConfirmOpen(true)}
         title={activeScreen === 'login' ? 'Login' : activeScreen === 'input' ? 'Voice Note' : activeScreen === 'dashboard' ? 'Dashboard' : activeScreen === 'export' ? 'Export' : 'Saved Handovers'}
-      />
+      />}
 
-      <main className="flex-1 w-full mx-auto px-4 pb-28 pt-4 sm:px-6 sm:py-8 lg:px-12 flex flex-col gap-5 sm:gap-8">
+      <main className={`mx-auto flex w-full flex-1 flex-col gap-5 px-4 sm:gap-8 sm:px-6 lg:px-12 ${currentUser ? 'pb-28 pt-4 sm:py-8' : 'pb-4 pt-2 sm:py-4'}`}>
         {isAuthChecking && <section className="mx-auto flex w-full max-w-md items-center justify-center rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-10 text-sm text-[var(--text-secondary)]">Checking session...</section>}
       {!isAuthChecking && !currentUser && (
       <LoginScreen
@@ -421,7 +517,54 @@ export const App: React.FC = () => {
       />
       )}
         {!isAuthChecking && currentUser && authMessage && <div role="alert" className="mx-auto w-full max-w-3xl rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-3 text-sm text-[var(--text-primary)]">{authMessage}</div>}
-        {!isAuthChecking && currentUser && <div className="flex justify-end"><button type="button" onClick={handleLogout} className="min-h-10 rounded-xl border border-[var(--border-main)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">Sign out</button></div>}
+        {isSignOutConfirmOpen && currentUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="sign-out-title">
+            <div className="w-full max-w-sm rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-5 shadow-2xl">
+              <h2 id="sign-out-title" className="text-base font-bold text-[var(--text-primary)]">Sign out?</h2>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">Your current session will be ended on this device.</p>
+              <div className="mt-5 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSignOutConfirmOpen(false)}
+                  className="min-h-11 flex-1 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignOutConfirmOpen(false);
+                    void handleLogout();
+                  }}
+                  className="min-h-11 flex-1 rounded-xl bg-[#000000] px-4 py-2.5 text-sm font-semibold text-white hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] dark:bg-[#f5f5f5] dark:text-[#050505] dark:hover:bg-white"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {pendingDeleteCaseId && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-handover-title"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !isDeletingCase) setPendingDeleteCaseId(null);
+            }}
+          >
+            <div className="w-full max-w-sm rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-5 shadow-2xl">
+              <h2 id="delete-handover-title" className="text-base font-bold text-[var(--text-primary)]">Delete handover?</h2>
+              <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)]">This will permanently delete this saved handover. This action cannot be undone.</p>
+              {savedListError && <p role="alert" className="mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">{savedListError}</p>}
+              <div className="mt-5 flex gap-2">
+                <button type="button" disabled={isDeletingCase} onClick={() => setPendingDeleteCaseId(null)} className="min-h-11 flex-1 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">Cancel</button>
+                <button type="button" disabled={isDeletingCase} onClick={() => void confirmDeleteSavedCase()} className="min-h-11 flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500">{isDeletingCase ? 'Deleting...' : 'Delete'}</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {currentUser && activeScreen === 'input' && <div className="mx-auto flex w-full max-w-md items-center justify-between rounded-xl border border-[#eceef0] bg-[var(--bg-card-muted)] p-3 shadow-sm dark:border-[var(--border-main)]">
           <div className="flex min-w-0 items-center gap-3">
@@ -457,6 +600,8 @@ export const App: React.FC = () => {
             <VoiceRecorder
               onAudioReady={handleAudioReady}
               onClearAudio={handleClearAudio}
+              onUploadAudio={() => audioInputRef.current?.click()}
+              onRequestTextEntry={() => setIsTranscriptVisible(true)}
               disabled={isProcessing || isTranscribing}
             />
 
@@ -464,6 +609,7 @@ export const App: React.FC = () => {
               onFileSelected={handleFileSelected}
               selectedFile={uploadedFile}
               onClearFile={handleClearFile}
+              inputRef={audioInputRef}
               disabled={isProcessing || isTranscribing}
             />
           </div>
@@ -474,19 +620,24 @@ export const App: React.FC = () => {
               onChange={setManualNotes}
               onLoadSample={handleLoadSampleNotes}
               onViewSaved={handleOpenSavedModal}
+              isVisible={isTranscriptVisible}
+              patientBed={patientBed}
+              onPatientBedChange={setPatientBed}
               disabled={isProcessing || isTranscribing}
             />
-            <p className="mt-3 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+            <p className="mt-3 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-3 py-2.5 text-xs leading-relaxed text-[var(--text-secondary)]">
               Clinical review required: transcription can contain errors. Verify names, medications,
               doses, timings, and clinical details before generating or using a handover.
             </p>
           </div>
 
           {/* Source-style primary action footer, backed by the real target handlers. */}
-          <div className="sticky bottom-20 z-20 mt-2 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)]/95 p-3 shadow-lg backdrop-blur-md">
-            <div className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-[#315f9f] dark:bg-[#8AB4FF]" />
-              <span>
+          <div className="sticky bottom-20 z-20 mt-1 rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)]/95 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.10)] backdrop-blur-md">
+            <div className="flex items-start gap-2">
+              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--text-primary)]" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[var(--text-primary)]">Review before generating</p>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--text-secondary)]">
                 {isTranscribing
                   ? 'Transcribing audio...'
                   : manualNotes.trim()
@@ -494,7 +645,8 @@ export const App: React.FC = () => {
                     : recordedBlob || uploadedFile
                       ? 'Audio selected. Transcribe it, then review the transcript below.'
                       : 'Enter notes manually, load the sample notes, or select a saved case.'}
-              </span>
+                </p>
+              </div>
             </div>
 
             <div className="mt-3 flex w-full flex-col gap-2 sm:flex-row">
@@ -502,7 +654,7 @@ export const App: React.FC = () => {
                 type="button"
                 onClick={handleTranscribeAudio}
                 disabled={isProcessing || isTranscribing || !(recordedBlob || uploadedFile)}
-                className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--border-card)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition-all hover:bg-[var(--bg-main)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition-all hover:bg-[var(--bg-input)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <FileText className="w-4 h-4" />
                 <span>{isTranscribing ? 'Transcribing...' : 'Transcribe Audio'}</span>
@@ -512,9 +664,9 @@ export const App: React.FC = () => {
                 type="button"
                 onClick={handleGenerateHandover}
                 disabled={isProcessing || isTranscribing || !manualNotes.trim()}
-                className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#315f9f] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#244a80] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#8AB4FF] dark:text-[#050505] dark:hover:bg-[#a9c8ff]"
+                className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#000000] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#f5f5f5] dark:text-[#050505] dark:hover:bg-white"
               >
-                <Sparkles className="w-4 h-4 text-[#edae49]" />
+                <Sparkles className="h-4 w-4" />
                 <span>Generate Handover</span>
               </button>
             </div>
@@ -539,120 +691,92 @@ export const App: React.FC = () => {
 
         {/* Section 3: Handover Dashboard */}
         {activeScreen === 'dashboard' && handoverResult && !isProcessing && (
-          <section className="mx-auto flex w-full max-w-md flex-col gap-5 pb-28 animate-fade-in scroll-mt-24 xl:max-w-7xl">
-            <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <section className="mx-auto flex w-full max-w-md flex-col gap-4 pb-28 animate-fade-in scroll-mt-24 xl:max-w-7xl">
+            <div
+              className="sticky z-30 -mx-1 space-y-2 bg-[var(--bg-main)] px-1 pb-2 pt-1"
+              style={{ top: 'calc(4rem + env(safe-area-inset-top, 0px))' }}
+            >
+            <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] text-[#315f9f] dark:text-[#8AB4FF]"><FileText className="h-5 w-5" /></div>
+                {getBedIdentifier(handoverResult.patientBed) ? (
+                  <div className="flex h-12 min-w-12 shrink-0 items-center justify-center rounded-full bg-[#16233f] px-2 text-sm font-bold text-white">
+                    {getBedIdentifier(handoverResult.patientBed)}
+                  </div>
+                ) : (
+                  <span className="shrink-0 text-sm font-medium text-[var(--text-muted)]">Not recorded</span>
+                )}
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-base font-bold text-[var(--text-primary)]">Current Handover</span>
-                    {handoverResult.caseId && <span className="max-w-full break-all rounded-full bg-[var(--bg-card-muted)] px-2 py-0.5 text-xs font-mono text-[var(--text-secondary)]">{handoverResult.caseId}</span>}
+                    <span className="text-base font-bold text-[var(--text-primary)]">{formatBedLabel(handoverResult.patientBed) ?? 'Bed not recorded'}</span>
                   </div>
                   <p className="mt-0.5 break-words text-xs text-[var(--text-secondary)]">
                     {handoverResult.patientReference ? `Patient reference: ${handoverResult.patientReference}` : 'No patient reference documented'}
                   </p>
                 </div>
               </div>
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                <span className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-300" /> Ready
-              </span>
-            </div>
-
-            <div className="flex flex-col gap-4 border-b border-[var(--border-main)] pb-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-xl font-bold text-[var(--text-primary)]">Handover Dashboard</h2>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 font-bold border border-emerald-500/30">
-                    Analysis Completed
-                  </span>
-                  {handoverResult.caseId && (
-                    <span className="rounded-full border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-2.5 py-0.5 text-xs font-mono font-medium text-[var(--text-secondary)]">
-                      Case: {handoverResult.caseId}
-                    </span>
-                  )}
-                  {handoverResult.patientReference && (
-                    <span className="rounded-full border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-2.5 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
-                      Pt: {handoverResult.patientReference}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                  Structured clinical categories ready for oncoming shift review
-                </p>
-              </div>
-
-              {/* Dashboard Actions */}
-              <div className="flex w-full items-center gap-2 flex-wrap sm:w-auto">
-                <button
-                  type="button"
-                  onClick={handleCopySummary}
-                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer sm:flex-none"
-                >
-                  <Copy className="w-3.5 h-3.5 text-[#315f9f] dark:text-[#8AB4FF]" />
-                  <span>{copied ? 'Copied!' : 'Copy Summary'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleOpenSavedModal}
-                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-card-muted)] cursor-pointer sm:flex-none"
-                >
-                  <Database className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
-                  <span>Saved Handovers</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleExportJson}
-                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer sm:flex-none"
-                >
-                  <Download className="w-3.5 h-3.5 text-[#315f9f] dark:text-[#8AB4FF]" />
-                  <span>Export JSON</span>
-                </button>
-
-                {/* Export PDF Button */}
-                <button
-                  type="button"
-                  onClick={handleExportPdf}
-                  disabled={!handoverResult || isExportingPdf}
-                  title={!handoverResult ? 'No handover available to export' : 'Export current handover as readable PDF'}
-                  className="flex min-h-10 flex-1 items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-card)] hover:bg-[var(--bg-card-muted)] border border-[var(--border-main)] rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed sm:flex-none"
-                >
-                  <FileDown className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
-                  <span>{isExportingPdf ? 'Exporting PDF...' : pdfExported ? 'PDF Downloaded!' : 'Export PDF'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHandoverResult(null);
-                    setActiveScreen('input');
-                  }}
-                  className="min-h-10 min-w-10 p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded-lg transition-colors cursor-pointer"
-                  title="Reset Dashboard"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            <button type="button" onClick={() => setActiveScreen('input')} className="self-start text-xs font-semibold text-[#315f9f] underline-offset-2 hover:underline dark:text-[#8AB4FF]">
-              ← Back to Voice Note
-            </button>
-
-            {/* Transcript Preview Box */}
-            <div className="bg-[var(--bg-card-muted)] rounded-2xl p-4 sm:p-5 border border-[var(--border-main)]">
-              <div className="flex flex-col items-start gap-2 mb-2 sm:flex-row sm:items-center sm:justify-between">
-                <span className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-[#315f9f] dark:text-[#8AB4FF]" />
-                  Raw Transcript Preview
+              <div className="flex shrink-0 items-center gap-2 sm:ml-auto">
+                <span className="hidden rounded-full border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)] sm:inline-flex">
+                  {handoverResult.createdAt ? new Date(handoverResult.createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', hour12: false }) : 'Saved handover'}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteCurrentHandover()}
+                  disabled={!handoverResult.caseId}
+                  aria-label="Delete handover"
+                  title="Delete handover"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-500/25 bg-rose-500/10 text-rose-700 transition-colors hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-rose-300"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleExportPdf()}
+                  disabled={isExportingPdf}
+                  aria-label="Export handover"
+                  title="Export handover"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-main)] bg-[var(--bg-card-muted)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <span className="rounded-full border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)] sm:hidden">
+                  {handoverResult.createdAt ? new Date(handoverResult.createdAt).toLocaleDateString('en-US') : 'Saved'}
+                </span>
+              </div>
+            </div>
+
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setHandoverResult(null);
+                  setActiveScreen('dashboard');
+                }}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+                aria-label="Back to Dashboard"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Back to Dashboard</span>
+              </button>
+            </div>
+
+            {/* Transcript Preview Box: keep the original source text visible for review. */}
+            <div className="rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 shadow-sm sm:p-5">
+              <div className="flex flex-col items-start gap-2 mb-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                <span className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-[#315f9f] dark:text-[#8AB4FF]" />
+                  Original Handover Transcript
+                </span>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Source transcript used to generate this handover.</p>
+                </div>
                 <span className="text-[11px] text-[var(--text-muted)] font-mono">
                   Shift: {handoverResult.shift}
                 </span>
               </div>
-              <p className="text-xs text-[var(--text-secondary)] leading-relaxed font-mono bg-[var(--bg-card)] p-3.5 rounded-xl border border-[var(--border-main)] break-words">
-                "{handoverResult.rawTranscript}"
+              <p className="whitespace-pre-wrap break-words rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] p-3.5 text-sm leading-7 text-[var(--text-secondary)]">
+                {handoverResult.rawTranscript || 'Original transcript is not available for this handover.'}
               </p>
             </div>
 
@@ -662,18 +786,63 @@ export const App: React.FC = () => {
         )}
 
         {activeScreen === 'dashboard' && !handoverResult && !isProcessing && !errorMessage && (
-          <section className="rounded-3xl border border-[var(--border-main)] bg-[var(--bg-card)] p-6 text-center shadow-sm sm:p-10">
-            <FileText className="mx-auto mb-3 h-10 w-10 text-[#00798c] dark:text-[#38bdf8]" />
-            <h2 className="text-lg font-bold text-[var(--text-primary)]">No current handover result</h2>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[var(--text-muted)]">Process reviewed notes or load a saved handover to view the structured dashboard.</p>
-            <button type="button" onClick={() => setActiveScreen('input')} className="mt-5 min-h-11 rounded-xl bg-[#00798c] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#006575]">Open Voice Note</button>
-          <button
-            type="button"
-            onClick={handleOpenSavedModal}
-            className="mt-3 min-h-11 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
-            >
-            View Saved Handovers
-          </button>
+          <section className="mx-auto flex w-full max-w-4xl flex-col gap-5 pb-28 animate-fade-in">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">Clinical workspace</p>
+                <h2 className="mt-1 text-2xl font-bold tracking-tight text-[var(--text-primary)]">Dashboard</h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">Your saved handovers at a glance.</p>
+              </div>
+              <button type="button" onClick={() => setActiveScreen('input')} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#000000] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] dark:bg-[#f5f5f5] dark:text-[#050505] dark:hover:bg-white">
+                Start new handover
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-3 text-sm">
+              <div>
+                <span className="block text-[var(--text-secondary)]">Saved handovers</span>
+                <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
+                  {savedList[0]?.created_at ? `Latest ${new Date(savedList[0].created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', hour12: false })}` : 'No saved record yet'}
+                </span>
+              </div>
+              <span className="font-semibold text-[var(--text-primary)]">{savedList.length}</span>
+            </div>
+
+            <div className="flex min-w-0 items-center justify-between gap-3 text-xs font-semibold text-[var(--text-secondary)]">
+              <span>Sort saved handovers</span>
+              <div className="relative" data-saved-sort-menu>
+                <button type="button" onClick={() => setIsSavedSortOpen((open) => !open)} aria-haspopup="menu" aria-expanded={isSavedSortOpen} className="inline-flex min-h-10 max-w-full items-center gap-2 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] px-3 text-sm font-normal text-[var(--text-primary)] outline-none hover:bg-[var(--bg-card-muted)] focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">
+                  <span className="max-w-[10rem] truncate">{savedSort === 'newest' ? 'Newest first' : savedSort === 'patient' ? 'Patient reference' : 'Bed number'}</span>
+                  <ChevronDown className="h-4 w-4 shrink-0" />
+                </button>
+                {isSavedSortOpen && (
+                  <div role="menu" className="absolute right-0 top-12 z-40 w-52 max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-1.5 shadow-xl">
+                    {(['newest', 'patient', 'bed'] as const).map((mode) => (
+                      <button key={mode} type="button" role="menuitemradio" aria-checked={savedSort === mode} onClick={() => { setSavedSort(mode); setIsSavedSortOpen(false); }} className="flex min-h-10 w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">
+                        <span>{mode === 'newest' ? 'Newest first' : mode === 'patient' ? 'Patient reference' : 'Bed number'}</span>
+                        {savedSort === mode && <Check className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <SavedHandoversModal
+              isOpen
+              presentation="screen"
+              showCloseButton={false}
+              onClose={() => setActiveScreen('input')}
+              savedHandovers={savedList}
+              sortMode={savedSort}
+              isLoading={isLoadingSaved}
+              errorMessage={savedListError}
+              onSelectCase={handleLoadSavedCase}
+              onDeleteCase={requestDeleteSavedCase}
+              onExportCase={handleExportSavedPdf}
+              exportingCaseId={exportingSavedAction?.endsWith(':pdf') ? exportingSavedAction.slice(0, -4) : null}
+              exportError={exportError}
+            />
           </section>
         )}
 
@@ -684,9 +853,20 @@ export const App: React.FC = () => {
               <p className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]">Export the current handover using the existing available formats.</p>
             </div>
             {handoverResult ? (
-              <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-5 sm:flex-row">
-                <button type="button" onClick={handleExportJson} className="min-h-11 flex-1 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-2.5 text-sm font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">Export JSON</button>
-                <button type="button" onClick={handleExportPdf} disabled={isExportingPdf} className="min-h-11 flex-1 rounded-xl bg-[#315f9f] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244a80] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">{isExportingPdf ? 'Exporting PDF...' : pdfExported ? 'PDF Downloaded!' : 'Export PDF'}</button>
+              <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-5">
+                <div className="relative self-end" data-export-menu>
+                  <button type="button" aria-haspopup="menu" aria-expanded={isCurrentExportMenuOpen} onClick={() => setIsCurrentExportMenuOpen((open) => !open)} disabled={isExportingPdf} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">
+                    <Download className="h-4 w-4" aria-hidden="true" />
+                    {isExportingPdf ? 'Exporting...' : pdfExported ? 'PDF Downloaded!' : 'Export'}
+                  </button>
+                  {isCurrentExportMenuOpen && !isExportingPdf && (
+                    <div role="menu" aria-label="Export current handover" className="absolute right-0 top-12 z-40 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-2 shadow-xl">
+                      <button type="button" role="menuitem" onClick={() => { setIsCurrentExportMenuOpen(false); handleExportPdf(); }} className="flex min-h-11 w-full items-start gap-3 rounded-lg px-3 py-2 text-left text-[var(--text-primary)] hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"><FileDown className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><span><span className="block text-sm font-semibold">PDF</span><span className="block text-xs text-[var(--text-muted)]">Readable document for viewing or sharing.</span></span></button>
+                      <button type="button" role="menuitem" onClick={() => { setIsCurrentExportMenuOpen(false); handleExportJson(); }} className="mt-1 flex min-h-11 w-full items-start gap-3 rounded-lg px-3 py-2 text-left text-[var(--text-primary)] hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"><FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><span><span className="block text-sm font-semibold">JSON</span><span className="block text-xs text-[var(--text-muted)]">Structured handover data.</span></span></button>
+                      <button type="button" onClick={() => setIsCurrentExportMenuOpen(false)} className="mt-1 min-h-10 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">Cancel</button>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-[var(--border-main)] bg-[var(--bg-card-muted)] p-8 text-center text-sm text-[var(--text-secondary)]">No current handover is available to export. Process or load a handover first.</div>
@@ -722,32 +902,42 @@ export const App: React.FC = () => {
                     const jsonKey = `${item.case_id}:json`;
                     return (
                       <article key={item.case_id} className="flex flex-col gap-3 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="break-all font-mono text-sm font-semibold text-[var(--text-primary)]">{item.case_id}</p>
-                          <p className="mt-1 break-words text-xs text-[var(--text-secondary)]">
-                            {item.patient_reference ? `Patient reference: ${item.patient_reference}` : 'No patient reference documented'}
+                        <div className="min-w-0 space-y-1">
+                          <p className="break-words text-base font-semibold text-[var(--text-primary)]">
+                            Bed: {getBedIdentifier(item.patient_bed) ?? 'Not recorded'}
                           </p>
-                          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                          <p className="break-words text-sm text-[var(--text-secondary)]">
+                            {item.patient_reference || 'Patient reference not recorded'}
+                          </p>
+                          <p className="text-sm text-[var(--text-muted)]">
                             Saved {new Date(item.created_at).toLocaleString()}
                           </p>
                         </div>
-                        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-52">
+                        <div className="relative w-full sm:w-auto" data-export-menu>
                           <button
                             type="button"
-                            onClick={() => handleExportSavedPdf(item.case_id)}
+                            aria-haspopup="menu"
+                            aria-expanded={exportMenuCaseId === item.case_id}
+                            onClick={() => setExportMenuCaseId((current) => current === item.case_id ? null : item.case_id)}
                             disabled={exportingSavedAction !== null}
-                            className="min-h-10 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+                            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-main)] bg-[var(--bg-card-muted)] px-4 py-2 text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] sm:w-32"
                           >
-                            {exportingSavedAction === pdfKey ? 'Exporting...' : 'Export PDF'}
+                            <FileDown className="h-4 w-4" aria-hidden="true" />
+                            {exportingSavedAction === pdfKey || exportingSavedAction === jsonKey ? 'Exporting...' : 'Export'}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleExportSavedJson(item.case_id)}
-                            disabled={exportingSavedAction !== null}
-                            className="min-h-10 rounded-lg bg-[#315f9f] px-3 py-2 text-xs font-semibold text-white hover:bg-[#244a80] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
-                          >
-                            {exportingSavedAction === jsonKey ? 'Exporting...' : 'Export JSON'}
-                          </button>
+                          {exportMenuCaseId === item.case_id && exportingSavedAction === null && (
+                            <div role="menu" aria-label={`Export ${formatBedLabel(item.patient_bed) ?? 'handover'}`} className="absolute right-0 top-12 z-40 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] p-2 shadow-xl">
+                              <button type="button" role="menuitem" onClick={() => handleSavedExportChoice(item.case_id, 'pdf')} className="flex min-h-11 w-full items-start gap-3 rounded-lg px-3 py-2 text-left text-[var(--text-primary)] hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">
+                                <FileDown className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                                <span><span className="block text-sm font-semibold">PDF</span><span className="block text-xs text-[var(--text-muted)]">Readable document for viewing or sharing.</span></span>
+                              </button>
+                              <button type="button" role="menuitem" onClick={() => handleSavedExportChoice(item.case_id, 'json')} className="mt-1 flex min-h-11 w-full items-start gap-3 rounded-lg px-3 py-2 text-left text-[var(--text-primary)] hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">
+                                <FileText className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                                <span><span className="block text-sm font-semibold">JSON</span><span className="block text-xs text-[var(--text-muted)]">Structured handover data.</span></span>
+                              </button>
+                              <button type="button" onClick={() => setExportMenuCaseId(null)} className="mt-1 min-h-10 w-full rounded-lg px-3 py-2 text-left text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-card-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]">Cancel</button>
+                            </div>
+                          )}
                         </div>
                       </article>
                     );
@@ -775,7 +965,7 @@ export const App: React.FC = () => {
               isLoading={isLoadingSaved}
               errorMessage={savedListError}
               onSelectCase={handleLoadSavedCase}
-              onDeleteCase={handleDeleteSavedCase}
+              onDeleteCase={requestDeleteSavedCase}
               onExportCase={handleExportSavedCase}
               exportingCaseId={exportingCaseId}
               exportError={exportError}
@@ -787,7 +977,7 @@ export const App: React.FC = () => {
       <MobileNav
         activeScreen={activeScreen}
         isAuthenticated={Boolean(currentUser)}
-        onLogin={() => setActiveScreen('login')}
+        onLogin={() => { if (!currentUser) setActiveScreen('login'); }}
         onInput={() => { if (currentUser) setActiveScreen('input'); }}
         onResult={() => { if (currentUser) setActiveScreen('dashboard'); }}
         onExport={() => { if (currentUser) setActiveScreen('export'); }}
@@ -802,7 +992,7 @@ export const App: React.FC = () => {
           isLoading={isLoadingSaved}
           errorMessage={savedListError}
           onSelectCase={handleLoadSavedCase}
-          onDeleteCase={handleDeleteSavedCase}
+          onDeleteCase={requestDeleteSavedCase}
           onExportCase={handleExportSavedCase}
           exportingCaseId={exportingCaseId}
           exportError={exportError}
@@ -810,7 +1000,7 @@ export const App: React.FC = () => {
       )}
 
       {/* Footer */}
-      <footer className="mt-auto border-t border-[var(--border-main)] bg-[var(--bg-card)] py-6 transition-colors duration-200">
+      {currentUser && <footer className="mt-auto border-t border-[var(--border-main)] bg-[var(--bg-card)] py-6 transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-[var(--text-muted)] gap-2">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[var(--text-primary)]">HandoverGuard</span>
@@ -821,7 +1011,7 @@ export const App: React.FC = () => {
             <span>Theme: {isDark ? 'Dark Mode' : 'Light Mode'}</span>
           </div>
         </div>
-      </footer>
+      </footer>}
       </div>
     </div>
   );

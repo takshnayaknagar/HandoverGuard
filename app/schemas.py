@@ -12,6 +12,7 @@ class HandoverRequest(BaseModel):
     """Request body for POST /process-handover."""
 
     transcript: str = Field(..., description="The doctor's voice-note transcript, as plain text.")
+    patient_bed: str | None = Field(default=None, max_length=128)
 
 
 class HandoverResponse(BaseModel):
@@ -26,6 +27,7 @@ class HandoverResponse(BaseModel):
     """
 
     patient_reference: str | None = None
+    patient_bed: str | None = None
     completed: list[str] = Field(default_factory=list)
     pending: list[str] = Field(default_factory=list)
     follow_up: list[str] = Field(default_factory=list)

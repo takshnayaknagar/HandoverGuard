@@ -14,7 +14,8 @@ from app.schemas import HandoverResponse
 import main
 
 SAMPLE_HANDOVER = HandoverResponse(
-    patient_reference="Bed 4",
+    patient_reference="Scott Rogers",
+    patient_bed="2",
     completed=["Morning medications given"],
     pending=["Blood test results pending"],
     follow_up=["Cardiology review tomorrow"],
@@ -45,7 +46,7 @@ def test_health_still_ok(client: TestClient):
     assert response.json() == {"status": "ok"}
 
 
-def test_valid_transcript_returns_six_field_handover(client: TestClient, mock_llm_success):
+def test_valid_transcript_returns_handover_with_separate_bed_metadata(client: TestClient, mock_llm_success):
     response = client.post(
         "/process-handover",
         json={"transcript": "Blood test results are pending. Cardiology review tomorrow."},
@@ -55,6 +56,7 @@ def test_valid_transcript_returns_six_field_handover(client: TestClient, mock_ll
     body = response.json()
     assert set(body.keys()) == {
         "patient_reference",
+        "patient_bed",
         "completed",
         "pending",
         "follow_up",
@@ -74,12 +76,23 @@ def test_valid_transcript_returns_six_field_handover(client: TestClient, mock_ll
     saved_record = main.get_handover(body["case_id"], owner_id=user_id)
     assert saved_record is not None
     assert saved_record["created_at"] == body["created_at"]
-    assert body["patient_reference"] == "Bed 4"
+    assert body["patient_reference"] == "Scott Rogers"
+    assert body["patient_bed"] == "2"
     assert body["completed"] == ["Morning medications given"]
     assert body["pending"] == ["Blood test results pending"]
     assert body["follow_up"] == ["Cardiology review tomorrow"]
     assert body["communication"] == ["Family updated"]
     assert body["unclear_or_undocumented"] == []
+
+
+def test_manual_bed_explicitly_overrides_extracted_bed(client: TestClient, mock_llm_success):
+    response = client.post(
+        "/process-handover",
+        json={"transcript": "In Bed 2, it's Scott Rogers.", "patient_bed": "3"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["patient_bed"] == "3"
 
 
 def test_empty_transcript_rejected(client: TestClient):

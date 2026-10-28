@@ -24,7 +24,7 @@ from app.config import settings
 from app.schemas import HandoverResponse
 
 VALID_JSON = (
-    '{"patient_reference": "Bed 4", "completed": ["Morning medications given"],'
+    '{"patient_reference": "Scott Rogers", "patient_bed": "4", "completed": ["Morning medications given"],'
     ' "pending": ["Blood test results pending"], "follow_up": ["Cardiology review tomorrow"],'
     ' "communication": ["Family updated"], "unclear_or_undocumented": []}'
 )
@@ -115,7 +115,8 @@ def test_successful_extraction_returns_validated_handover(fake_llm):
     result = process_transcript_with_llm("Morning medications given. Bed 4.")
 
     assert isinstance(result, HandoverResponse)
-    assert result.patient_reference == "Bed 4"
+    assert result.patient_reference == "Scott Rogers"
+    assert result.patient_bed == "4"
     assert result.completed == ["Morning medications given"]
     assert result.pending == ["Blood test results pending"]
     assert result.follow_up == ["Cardiology review tomorrow"]
@@ -212,7 +213,8 @@ def test_server_error_retries_once_then_succeeds(fake_llm):
 
     result = process_transcript_with_llm("Some transcript.")
 
-    assert result.patient_reference == "Bed 4"
+    assert result.patient_reference == "Scott Rogers"
+    assert result.patient_bed == "4"
     assert len(fake.chat.completions.calls) == 2  # initial attempt + the single retry
 
 
@@ -293,6 +295,7 @@ def test_missing_api_key_fails_fast_without_network(fake_llm, monkeypatch):
 def _handover_json(**overrides) -> str:
     payload = {
         "patient_reference": None,
+        "patient_bed": None,
         "completed": [],
         "pending": [],
         "follow_up": [],
@@ -344,6 +347,23 @@ def test_empty_patient_reference_normalised_to_null(fake_llm):
     result = process_transcript_with_llm("Some transcript.")
 
     assert result.patient_reference is None
+
+
+def test_explicit_bed_is_preserved_separately(fake_llm):
+    fake_llm([FakeResponse(_handover_json(patient_reference="Scott Rogers", patient_bed=" 2 "))])
+
+    result = process_transcript_with_llm("In Bed 2, it's Scott Rogers.")
+
+    assert result.patient_reference == "Scott Rogers"
+    assert result.patient_bed == "2"
+
+
+def test_missing_bed_remains_null(fake_llm):
+    fake_llm([FakeResponse(_handover_json(patient_reference="Scott Rogers"))])
+
+    result = process_transcript_with_llm("Scott Rogers is stable.")
+
+    assert result.patient_bed is None
 
 
 def test_excessive_item_count_rejected(fake_llm, monkeypatch):
@@ -428,6 +448,7 @@ def test_live_groq_fictional_transcript():
 
     assert set(result.model_dump().keys()) == {
         "patient_reference",
+        "patient_bed",
         "completed",
         "pending",
         "follow_up",

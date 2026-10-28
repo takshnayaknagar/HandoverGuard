@@ -131,12 +131,13 @@ def _sanitise(handover: HandoverResponse) -> HandoverResponse:
     - removes EXACT duplicates (same text after stripping) within a category
       and across categories (first category wins) — similar-but-different
       wording is always preserved, never merged
-    - normalises an empty/whitespace patient_reference to null
+    - normalises empty/whitespace metadata fields to null
     Bounds are checked AFTER this clean-up so harmless blank items cannot
     cause rejection; genuine overruns raise llm_invalid_response instead of
     being silently truncated.
     """
     patient_reference = (handover.patient_reference or "").strip() or None
+    patient_bed = (handover.patient_bed or "").strip() or None
 
     cleaned: dict[str, list[str]] = {}
     seen: set[str] = set()
@@ -161,7 +162,11 @@ def _sanitise(handover: HandoverResponse) -> HandoverResponse:
             "LLM returned more items than the configured maximum."
         )
 
-    return HandoverResponse(patient_reference=patient_reference, **cleaned)
+    return HandoverResponse(
+        patient_reference=patient_reference,
+        patient_bed=patient_bed,
+        **cleaned,
+    )
 
 
 def process_transcript_with_llm(transcript: str) -> HandoverResponse:

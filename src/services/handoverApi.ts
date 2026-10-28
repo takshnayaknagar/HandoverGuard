@@ -14,7 +14,7 @@ const HANDOVERS_URL = '/api/handovers';
 
 export interface AuthenticatedUser {
   user_id: string;
-  username: string;
+  staff_id: string;
 }
 
 export class SessionExpiredError extends Error {
@@ -40,12 +40,12 @@ export const getCurrentUser = async (): Promise<AuthenticatedUser | null> => {
   return response.json() as Promise<AuthenticatedUser>;
 };
 
-export const login = async (username: string, password: string): Promise<AuthenticatedUser> => {
+export const login = async (staffId: string, password: string): Promise<AuthenticatedUser> => {
   const response = await fetch('/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ username, password })
+    body: JSON.stringify({ staff_id: staffId, password })
   });
   const body = await response.json().catch(() => null) as { detail?: string; error?: { message?: string } } | null;
   if (!response.ok) throw new Error(body?.error?.message || body?.detail || 'Invalid staff ID or password.');
@@ -107,6 +107,7 @@ export const transcribeAudio = async (audio: Blob | File): Promise<string> => {
 export interface BackendHandover {
   case_id?: string;
   patient_reference: string | null;
+  patient_bed: string | null;
   completed: string[];
   pending: string[];
   follow_up: string[];
@@ -118,6 +119,7 @@ export interface BackendHandover {
 export interface SavedHandoverSummary {
   case_id: string;
   patient_reference: string | null;
+  patient_bed: string | null;
   created_at: string;
 }
 
@@ -125,6 +127,7 @@ export interface GenerateHandoverPayload {
   audioBlob?: Blob;
   audioFile?: File;
   rawText?: string;
+  patientBed?: string;
 }
 
 function toItems(category: HandoverItem['category'], texts: string[], patient?: string): HandoverItem[] {
@@ -152,6 +155,7 @@ export function mapBackendResponse(
     timestamp: createdAt,
     caseId: caseId,
     patientReference: backend.patient_reference ?? null,
+    patientBed: backend.patient_bed ?? null,
     createdAt: createdAt,
     // Metrics UNIMPLEMENTED in dashboard; kept for JSON schema compatibility
     summary: {
@@ -196,7 +200,7 @@ export const generateHandover = async (
   const response = await fetchWithSession(PROCESS_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transcript })
+    body: JSON.stringify({ transcript, patient_bed: payload.patientBed?.trim() || null })
   });
 
   if (!response.ok) {

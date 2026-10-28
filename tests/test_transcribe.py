@@ -347,6 +347,7 @@ def test_process_handover_contract_unchanged(client: TestClient, monkeypatch):
     body = response.json()
     assert set(body.keys()) == {
         "patient_reference",
+        "patient_bed",
         "completed",
         "pending",
         "follow_up",

@@ -1,0 +1,3 @@
+# One JSON object per synthetic/de-identified clip. Paths are relative to this file.
+# Example:
+# {"id":"medication-001","audio":"audio/medication-001.wav","reference":"No fever. Give amoxicillin 500 milligrams at 08:00; dose not confirmed.","critical_terms":{"medications":["amoxicillin"],"numbers":["500","08:00"],"units":["milligrams"],"negations":["No fever","not confirmed"]}}

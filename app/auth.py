@@ -28,13 +28,13 @@ def _connection():
         connection.close()
 
 
-def normalize_username(username: str) -> str:
+def normalize_staff_id(staff_id: str) -> str:
     """Return the canonical form used for account uniqueness."""
-    if not isinstance(username, str):
-        raise ValueError("Username must be text")
-    normalized = username.strip().casefold()
-    if not normalized or len(normalized) > 320 or any(char.isspace() for char in normalized):
-        raise ValueError("Username must be a non-empty email or username without spaces")
+    if not isinstance(staff_id, str):
+        raise ValueError("Staff ID must be text")
+    normalized = staff_id.strip().casefold()
+    if not normalized or len(normalized) > 128 or '@' in normalized or any(char.isspace() for char in normalized):
+        raise ValueError("Staff ID must be non-empty and contain no spaces")
     return normalized
 
 
@@ -62,9 +62,9 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return False
 
 
-def create_user(username: str, password: str) -> str:
-    """Create one active user; duplicate normalized usernames are rejected."""
-    normalized = normalize_username(username)
+def create_user(staff_id: str, password: str) -> str:
+    """Create one active user; duplicate normalized Staff IDs are rejected."""
+    normalized = normalize_staff_id(staff_id)
     password_hash = hash_password(password)
     user_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
@@ -83,13 +83,13 @@ def create_user(username: str, password: str) -> str:
             error.sqlite_errorname == "SQLITE_CONSTRAINT_UNIQUE"
             and "users.username" in str(error)
         ):
-            raise ValueError("An account with this username already exists") from error
+            raise ValueError("An account with this Staff ID already exists") from error
         raise
     return user_id
 
 
-def get_user_by_username(username: str) -> dict | None:
-    normalized = normalize_username(username)
+def get_user_by_staff_id(staff_id: str) -> dict | None:
+    normalized = normalize_staff_id(staff_id)
     initialize_database()
     with _connection() as connection:
         row = connection.execute(
@@ -97,6 +97,22 @@ def get_user_by_username(username: str) -> dict | None:
             (normalized,),
         ).fetchone()
     return dict(row) if row else None
+
+
+def remove_user_by_staff_id(staff_id: str) -> None:
+    """Remove an account only when it owns no handovers."""
+    if not isinstance(staff_id, str) or not staff_id.strip() or any(char.isspace() for char in staff_id.strip()):
+        raise ValueError("Staff ID must be non-empty and contain no spaces")
+    normalized = staff_id.strip().casefold()
+    initialize_database()
+    with _connection() as connection:
+        row = connection.execute("SELECT user_id FROM users WHERE username = ?", (normalized,)).fetchone()
+        if row is None:
+            raise ValueError("No account exists for that Staff ID")
+        owned = connection.execute("SELECT 1 FROM handovers WHERE owner_id = ? LIMIT 1", (row["user_id"],)).fetchone()
+        if owned is not None:
+            raise ValueError("Account owns saved handovers; deactivate it instead of deleting it")
+        connection.execute("DELETE FROM users WHERE user_id = ?", (row["user_id"],))
 
 
 def hash_session_token(token: str) -> str:

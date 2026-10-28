@@ -80,6 +80,7 @@ def initialize_database():
                 case_id TEXT PRIMARY KEY,
                 owner_id TEXT REFERENCES users(user_id) ON DELETE RESTRICT,
                 patient_reference TEXT,
+                patient_bed TEXT,
                 transcript TEXT NOT NULL,
                 completed TEXT NOT NULL,
                 pending TEXT NOT NULL,
@@ -99,6 +100,8 @@ def initialize_database():
             connection.execute(
                 "ALTER TABLE handovers ADD COLUMN owner_id TEXT REFERENCES users(user_id) ON DELETE RESTRICT"
             )
+        if "patient_bed" not in handover_columns:
+            connection.execute("ALTER TABLE handovers ADD COLUMN patient_bed TEXT")
 
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_handovers_owner_id ON handovers(owner_id)"
@@ -120,16 +123,17 @@ def save_handover(transcript: str, handover: dict, owner_id: str) -> str:
         connection.execute(
             """
             INSERT INTO handovers (
-                case_id, owner_id, patient_reference, transcript, completed,
+                case_id, owner_id, patient_reference, patient_bed, transcript, completed,
                 pending, follow_up, communication,
                 unclear_or_undocumented, created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 case_id,
                 owner_id,
                 handover.get("patient_reference"),
+                handover.get("patient_bed"),
                 transcript,
                 json.dumps(handover.get("completed", [])),
                 json.dumps(handover.get("pending", [])),
@@ -151,7 +155,7 @@ def list_handovers(owner_id: str) -> list[dict]:
     with _connection() as connection:
         rows = connection.execute(
             """
-            SELECT case_id, patient_reference, created_at
+            SELECT case_id, patient_reference, patient_bed, created_at
             FROM handovers
             WHERE owner_id = ?
             ORDER BY created_at DESC

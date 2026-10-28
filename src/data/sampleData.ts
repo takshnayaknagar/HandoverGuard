@@ -1,32 +1,32 @@
 import type { HandoverOutput } from '../types/handover';
 
 export const SAMPLE_HANDOVER_OUTPUT: HandoverOutput = {
-  id: "HO-2026-1014-NIGHT",
-  shift: "Night Shift Handover (Ward 4B - Acute Medical)",
+  id: "DEMO-HANDOVER-001",
+  shift: "Fictional Demo Handover",
   timestamp: "2026-10-13T21:45:00Z",
   summary: {
     patientCount: 6,
-    criticalAlerts: 1,
+    criticalAlerts: 0,
     pendingTasks: 3,
     followupsDue: 2
   },
-  rawTranscript: `Handover for Bed 12, John Doe: Blood pressure checked at 21:00, stable at 124/82. Blood test for cardiac enzymes sent at 20:30, result is awaited. When the cardiac enzyme panel arrives, please review immediately. Bed 14, Mary Jenkins: Family called inquiring about tomorrow morning's discharge plan, advised them Dr. Reynolds rounds at 09:00. ECG completion status is not documented in the chart, needs verification with night nurse or technician before morning ward round.`,
+  rawTranscript: `FICTIONAL DEMO — NOT REAL PATIENT DATA. This sample is for demonstrating the handover workflow only. Demo Bed 12: A routine observation was recorded. A laboratory result is pending review by the responsible clinician. Demo Bed 14: A family member asked about the expected discharge plan; the team will provide an update after the next review. The completion status of a requested test is not documented and needs verification. Demo Bed 15: A report is awaiting completion. Demo Bed 03: A mobility assessment has been requested for a future review. Other tasks and statuses must be confirmed from the actual handover notes.`,
   items: {
     pending: [
       {
         id: "p-1",
         category: "pending",
-        title: "Blood test result awaited",
-        description: "Cardiac enzyme panel sent at 20:30 to pathology. Lab turn-around expected ~22:30.",
-        patient: "Bed 12 - John Doe",
-        urgency: "high"
+        title: "Laboratory result pending",
+        description: "The provided demo notes state that a laboratory result is awaited. Review its status using the appropriate clinical workflow.",
+        patient: "Demo Bed 12",
+        urgency: "medium"
       },
       {
         id: "p-2",
         category: "pending",
-        title: "Chest X-Ray formal radiology report",
-        description: "Portable AP film taken; pending final sign-off by radiologist on call.",
-        patient: "Bed 15 - Robert Vance",
+        title: "Report pending",
+        description: "The demo notes indicate that a report is awaiting completion. Verify its current status.",
+        patient: "Demo Bed 15",
         urgency: "medium"
       }
     ],
@@ -34,35 +34,35 @@ export const SAMPLE_HANDOVER_OUTPUT: HandoverOutput = {
       {
         id: "f-1",
         category: "followup",
-        title: "Review cardiac blood test result when available",
-        description: "If troponin is elevated > 14 ng/L, notify Registrar on call immediately for titration.",
-        patient: "Bed 12 - John Doe",
-        urgency: "critical"
+        title: "Review pending laboratory result",
+        description: "The result is not available in this sample. The responsible clinician should review it when available and follow local procedures.",
+        patient: "Demo Bed 12",
+        urgency: "medium"
       },
       {
         id: "f-2",
         category: "followup",
-        title: "Re-check blood glucose pre-midnight",
-        description: "Sliding scale insulin protocol check at 23:30.",
-        patient: "Bed 08 - Arthur Dent",
-        urgency: "medium"
+        title: "Follow up on requested mobility assessment",
+        description: "The demo notes state that an assessment was requested. Confirm its status with the responsible team.",
+        patient: "Demo Bed 03",
+        urgency: "low"
       }
     ],
     completed: [
       {
         id: "c-1",
         category: "completed",
-        title: "Blood pressure checked & recorded",
-        description: "BP 124/82 mmHg, HR 74 bpm regular, SpO2 98% room air. Chart updated.",
-        patient: "Bed 12 - John Doe",
+        title: "Routine observation recorded",
+        description: "The fictional demo notes state that an observation was recorded. No actual patient measurements are provided.",
+        patient: "Demo Bed 12",
         urgency: "low"
       },
       {
         id: "c-2",
         category: "completed",
-        title: "IV fluid line change completed",
-        description: "Normal Saline 1000ml replaced under aseptic technique at 20:00.",
-        patient: "Bed 14 - Mary Jenkins",
+        title: "Handover communication recorded",
+        description: "The demo illustrates recording a completed communication task. Verify completion from actual notes in real use.",
+        patient: "Demo Bed 14",
         urgency: "low"
       }
     ],
@@ -70,17 +70,17 @@ export const SAMPLE_HANDOVER_OUTPUT: HandoverOutput = {
       {
         id: "com-1",
         category: "communication",
-        title: "Family asked about discharge plan",
-        description: "Daughter phoned. Informed that Dr. Reynolds will review during morning rounds at 09:00.",
-        patient: "Bed 14 - Mary Jenkins",
+        title: "Discharge plan enquiry",
+        description: "A family member asked about the expected discharge plan. An update is to be provided after the next review.",
+        patient: "Demo Bed 14",
         urgency: "low"
       },
       {
         id: "com-2",
         category: "communication",
-        title: "Physiotherapy referral handover",
-        description: "Mobility assessment requested for post-op mobilization tomorrow morning.",
-        patient: "Bed 03 - Evelyn Reed",
+        title: "Mobility assessment request",
+        description: "The demo notes state that a mobility assessment was requested. Confirm the request and its status with the responsible team.",
+        patient: "Demo Bed 03",
         urgency: "low"
       }
     ],
@@ -88,19 +88,187 @@ export const SAMPLE_HANDOVER_OUTPUT: HandoverOutput = {
       {
         id: "v-1",
         category: "verification",
-        title: "ECG completion status is not documented",
-        description: "Order placed at 19:00 but no printout in paper binder or digital trace in PACS. Needs verification.",
-        patient: "Bed 14 - Mary Jenkins",
-        urgency: "high"
+        title: "Requested test completion status is undocumented",
+        description: "The sample notes do not establish whether the test was completed. Verify its status with the responsible team.",
+        patient: "Demo Bed 14",
+        urgency: "medium"
       },
       {
         id: "v-2",
         category: "verification",
-        title: "Confirm NPO status prior to morning endoscopy",
-        description: "Midnight nil-by-mouth sticker missing from bedside whiteboard.",
-        patient: "Bed 07 - Samuel Brooks",
+        title: "Confirm outstanding task statuses",
+        description: "The sample does not establish the current status of all outstanding tasks. Check the actual handover notes before relying on any status.",
+        patient: "Demo Bed 07",
         urgency: "medium"
       }
     ]
   }
 };
+
+export const SAMPLE_HANDOVERS: HandoverOutput[] = [
+  {
+    id: "DEMO-BED-12",
+    shift: "Fictional Demo — Bed 12",
+    timestamp: "2026-10-13T21:45:00Z",
+    patientBed: "12",
+    summary: {
+      patientCount: 1,
+      criticalAlerts: 0,
+      pendingTasks: 1,
+      followupsDue: 1
+    },
+    rawTranscript:
+      "FICTIONAL DEMO — NOT REAL PATIENT DATA. Demo Bed 12: A routine observation was recorded. A laboratory result is pending review by the responsible clinician.",
+    items: {
+      pending: [
+        {
+          id: "p-12",
+          category: "pending",
+          title: "Laboratory result pending",
+          description: "A laboratory result is awaiting review by the responsible clinician.",
+          patient: "Demo Bed 12",
+          urgency: "medium"
+        }
+      ],
+      followup: [
+        {
+          id: "f-12",
+          category: "followup",
+          title: "Review laboratory result",
+          description: "Review the result when available and follow local procedures.",
+          patient: "Demo Bed 12",
+          urgency: "medium"
+        }
+      ],
+      completed: [
+        {
+          id: "c-12",
+          category: "completed",
+          title: "Routine observation recorded",
+          description: "The fictional note states that an observation was recorded; no measurements are provided.",
+          patient: "Demo Bed 12",
+          urgency: "low"
+        }
+      ],
+      communication: [],
+      verification: []
+    }
+  },
+  {
+    id: "DEMO-BED-14",
+    shift: "Fictional Demo — Bed 14",
+    timestamp: "2026-10-13T21:45:00Z",
+    patientBed: "14",
+    summary: {
+      patientCount: 1,
+      criticalAlerts: 0,
+      pendingTasks: 1,
+      followupsDue: 0
+    },
+    rawTranscript:
+      "FICTIONAL DEMO — NOT REAL PATIENT DATA. Demo Bed 14: A family member asked about the expected discharge plan; the team will provide an update after the next review. The completion status of a requested test is not documented and needs verification.",
+    items: {
+      pending: [
+        {
+          id: "p-14",
+          category: "pending",
+          title: "Provide discharge plan update",
+          description: "The team will provide an update after the next review.",
+          patient: "Demo Bed 14",
+          urgency: "low"
+        }
+      ],
+      followup: [],
+      completed: [],
+      communication: [
+        {
+          id: "com-14",
+          category: "communication",
+          title: "Family member asked about discharge plan",
+          description: "A family member asked about the expected discharge plan. An update is planned after the next review.",
+          patient: "Demo Bed 14",
+          urgency: "low"
+        }
+      ],
+      verification: [
+        {
+          id: "v-14",
+          category: "verification",
+          title: "Verify requested test status",
+          description: "The transcript does not establish whether the requested test was completed. Verify its status with the responsible team.",
+          patient: "Demo Bed 14",
+          urgency: "medium"
+        }
+      ]
+    }
+  },
+  {
+    id: "DEMO-BED-15",
+    shift: "Fictional Demo — Bed 15",
+    timestamp: "2026-10-13T21:45:00Z",
+    patientBed: "15",
+    summary: {
+      patientCount: 1,
+      criticalAlerts: 0,
+      pendingTasks: 1,
+      followupsDue: 0
+    },
+    rawTranscript:
+      "FICTIONAL DEMO — NOT REAL PATIENT DATA. Demo Bed 15: A report is awaiting completion.",
+    items: {
+      pending: [
+        {
+          id: "p-15",
+          category: "pending",
+          title: "Report awaiting completion",
+          description: "The fictional transcript states that a report is awaiting completion. Verify its current status.",
+          patient: "Demo Bed 15",
+          urgency: "medium"
+        }
+      ],
+      followup: [],
+      completed: [],
+      communication: [],
+      verification: []
+    }
+  },
+  {
+    id: "DEMO-BED-03",
+    shift: "Fictional Demo — Bed 03",
+    timestamp: "2026-10-13T21:45:00Z",
+    patientBed: "03",
+    summary: {
+      patientCount: 1,
+      criticalAlerts: 0,
+      pendingTasks: 1,
+      followupsDue: 1
+    },
+    rawTranscript:
+      "FICTIONAL DEMO — NOT REAL PATIENT DATA. Demo Bed 03: A mobility assessment has been requested for a future review.",
+    items: {
+      pending: [
+        {
+          id: "p-03",
+          category: "pending",
+          title: "Mobility assessment requested",
+          description: "A mobility assessment has been requested for a future review. Its completion is not established by this transcript.",
+          patient: "Demo Bed 03",
+          urgency: "low"
+        }
+      ],
+      followup: [
+        {
+          id: "f-03",
+          category: "followup",
+          title: "Follow up on mobility assessment",
+          description: "Confirm the assessment's status with the responsible team at the planned review.",
+          patient: "Demo Bed 03",
+          urgency: "low"
+        }
+      ],
+      completed: [],
+      communication: [],
+      verification: []
+    }
+  }
+];

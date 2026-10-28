@@ -6,45 +6,46 @@ import main
 import uuid
 
 
-def _login(client: TestClient, username: str, password: str):
-    return client.post("/login", json={"username": username, "password": password})
+def _login(client: TestClient, staff_id: str, password: str):
+    return client.post("/login", json={"staff_id": staff_id, "password": password})
 
 
 def test_login_me_logout_and_invalid_credentials(anonymous_client: TestClient):
-    user_id = auth.create_user("demo@example.com", "a sufficiently long password")
-    response = _login(anonymous_client, "DEMO@example.com", "a sufficiently long password")
+    user_id = auth.create_user("demo-001", "a sufficiently long password")
+    response = _login(anonymous_client, "DEMO-001", "a sufficiently long password")
     assert response.status_code == 200
-    assert response.json() == {"user_id": user_id, "username": "demo@example.com"}
+    assert response.json() == {"user_id": user_id, "staff_id": "demo-001"}
     assert anonymous_client.get("/me").status_code == 200
     assert anonymous_client.post("/logout").status_code == 200
     assert anonymous_client.get("/me").status_code == 401
-    assert _login(anonymous_client, "demo@example.com", "wrong password").status_code == 401
+    assert _login(anonymous_client, "demo-001", "wrong password").status_code == 401
 
 
 def test_origin_validation_rejects_cross_origin_login(anonymous_client: TestClient):
-    auth.create_user("demo", "a sufficiently long password")
+    auth.create_user("demo-002", "a sufficiently long password")
     response = anonymous_client.post(
         "/login",
         headers={"Origin": "https://untrusted.example"},
-        json={"username": "demo", "password": "a sufficiently long password"},
+        json={"staff_id": "demo-002", "password": "a sufficiently long password"},
     )
     assert response.status_code == 403
 
 def test_login_accepts_configured_origin(anonymous_client: TestClient):
-    auth.create_user("demo", "a sufficiently long password")
+    auth.create_user("demo-003", "a sufficiently long password")
     response = anonymous_client.post(
         "/login",
         headers={"Origin": "http://localhost:3000"},
-        json={"username": "demo", "password": "a sufficiently long password"},
+        json={"staff_id": "demo-003", "password": "a sufficiently long password"},
     )
     assert response.status_code == 200
 
 
 def test_login_rejects_missing_origin(anonymous_client: TestClient):
+    auth.create_user("demo-004", "a sufficiently long password")
     anonymous_client.headers.pop("Origin", None)
     response = anonymous_client.post(
         "/login",
-        json={"username": "demo", "password": "a sufficiently long password"},
+        json={"staff_id": "demo-004", "password": "a sufficiently long password"},
     )
     assert response.status_code == 403
 

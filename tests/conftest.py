@@ -26,7 +26,7 @@ def client(anonymous_client):
     auth.create_user("test-user", "a sufficiently long test password")
     response = anonymous_client.post(
         "/login",
-        json={"username": "test-user", "password": "a sufficiently long test password"},
+        json={"staff_id": "test-user", "password": "a sufficiently long test password"},
     )
     assert response.status_code == 200
     yield anonymous_client

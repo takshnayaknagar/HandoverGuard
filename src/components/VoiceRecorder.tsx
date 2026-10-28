@@ -1,15 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Play, Pause, RotateCcw, Volume2 } from 'lucide-react';
+import { Mic, Play, Pause, RotateCcw, Volume2 } from 'lucide-react';
 
 interface VoiceRecorderProps {
   onAudioReady: (audioBlob: Blob, audioUrl: string) => void;
   onClearAudio: () => void;
+  onUploadAudio: () => void;
+  onRequestTextEntry: () => void;
   disabled?: boolean;
 }
 
 export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   onAudioReady,
   onClearAudio,
+  onUploadAudio,
+  onRequestTextEntry,
   disabled = false
 }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -25,8 +29,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const timerIntervalRef = useRef<number | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
 
-  // Format seconds into MM:SS
   const formatTime = (secs: number) => {
+    if (!Number.isFinite(secs) || secs < 0) return null;
     const mins = Math.floor(secs / 60);
     const remainingSecs = Math.floor(secs % 60);
     return `${mins.toString().padStart(2, '0')}:${remainingSecs.toString().padStart(2, '0')}`;
@@ -98,6 +102,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     }
     setAudioUrl(null);
     setRecordingDuration(0);
+    setAudioDuration(0);
     setPlaybackTime(0);
     setIsPlaying(false);
     onClearAudio();
@@ -123,15 +128,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   }, [audioUrl]);
 
   return (
-    <div className="rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card)] p-4 transition-colors duration-200 sm:p-5">
-      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+    <div className="rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] p-4 shadow-[0_2px_8px_rgba(15,23,42,0.06)] transition-colors duration-200 sm:p-5">
+      <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className={`h-2.5 w-2.5 rounded-full ${isRecording ? 'bg-[#b54747] animate-ping' : audioUrl ? 'bg-emerald-500' : 'bg-[var(--border-card)]'}`} />
-          <h3 className="font-semibold text-[var(--text-primary)] text-base">Direct Voice Recording</h3>
+          <div className={`h-2 w-2 rounded-full ${isRecording ? 'bg-[#ba1a1a] animate-ping' : audioUrl ? 'bg-emerald-500' : 'bg-[var(--border-card)]'}`} />
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">Record Handover</h3>
         </div>
-        <span className="self-end sm:self-auto text-xs font-mono font-medium px-2.5 py-1 rounded-md bg-[var(--bg-card-muted)] text-[var(--text-secondary)]" aria-label="Recording duration">
-          {isRecording ? formatTime(recordingDuration) : audioUrl ? formatTime(audioDuration || recordingDuration) : '00:00'}
-        </span>
+        <span className="text-[10px] text-[var(--text-muted)]">Browser microphone</span>
       </div>
 
       {micError && (
@@ -141,32 +144,20 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       )}
 
       {/* Recording Actions */}
-      <div className="relative flex flex-col items-center gap-4 rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)]/45 p-4 sm:p-5">
+      <div className="relative flex flex-col items-center gap-3 rounded-xl bg-[var(--bg-card-muted)] p-5 sm:p-6">
         <div className="text-center text-xs font-medium text-[var(--text-secondary)]">
           {isRecording ? 'Recording live audio from this browser' : audioUrl ? 'Recording ready for review or transcription' : 'Start a recording when you are ready'}
         </div>
         {!audioUrl ? (
-          !isRecording ? (
-            <button
-              type="button"
-              onClick={startRecording}
-              disabled={disabled}
-              aria-label="Start voice recording"
-              className="flex h-28 w-28 flex-col items-center justify-center gap-2 rounded-full bg-[#DC3535] px-3 py-3.5 font-medium text-white transition-colors hover:bg-[#B82B2B] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
-            >
-              <Mic className="h-8 w-8 text-white" />
-              <span className="text-xs font-bold tracking-[0.16em]">RECORD</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={stopRecording}
-              aria-label="Stop voice recording"
-              className="flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-4 py-3.5 text-center font-medium text-white transition-colors hover:bg-[#292929] sm:w-auto sm:min-w-56 cursor-pointer animate-pulse touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"            >
-              <Square className="w-5 h-5 text-[#edae49] fill-[#edae49]" />
-              <span>Stop Recording ({formatTime(recordingDuration)})</span>
-            </button>
-          )
+          <button
+            type="button"
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={disabled}
+            aria-label={isRecording ? 'Stop voice recording' : 'Start voice recording'}
+            className={`flex h-24 w-24 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] ${isRecording ? 'bg-[#171717]' : 'bg-[#000000] dark:bg-[#f5f5f5] dark:text-[#050505]'}`}
+          >
+            <Mic className="h-8 w-8" />
+          </button>
         ) : (
           /* Playback Preview */
           <div className="w-full flex flex-col gap-3">
@@ -175,7 +166,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
                 type="button"
                 onClick={togglePlayback}
                 aria-label={isPlaying ? 'Pause recorded audio' : 'Play recorded audio'}
-              className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#315f9f] text-white transition-colors hover:bg-[#244a80] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--border-main)] bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm transition-colors hover:bg-[var(--bg-card-muted)] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF]"
               >
                 {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
               </button>
@@ -183,16 +174,14 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               <div className="flex-1">
                 <div className="flex items-center justify-between text-xs text-[var(--text-muted)] mb-1">
                   <span className="flex items-center gap-1 font-mono">
-                    <Volume2 className="w-3.5 h-3.5 text-[#00798c] dark:text-[#38bdf8]" />
-                    {formatTime(playbackTime)}
+                    <Volume2 className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                   </span>
-                  <span className="font-mono">{formatTime(audioDuration || recordingDuration)}</span>
                 </div>
                 <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
                   <div
                     className="bg-[#00798c] dark:bg-[#38bdf8] h-full transition-all duration-100"
                     style={{
-                      width: `${audioDuration > 0 ? (playbackTime / audioDuration) * 100 : 0}%`
+                      width: `${Number.isFinite(audioDuration) && audioDuration > 0 && Number.isFinite(playbackTime) ? Math.min(100, Math.max(0, (playbackTime / audioDuration) * 100)) : 0}%`
                     }}
                   />
                 </div>
@@ -213,7 +202,10 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               ref={audioElementRef}
               src={audioUrl}
               onTimeUpdate={(e) => setPlaybackTime(e.currentTarget.currentTime)}
-              onLoadedMetadata={(e) => setAudioDuration(e.currentTarget.duration)}
+              onLoadedMetadata={(e) => {
+                const duration = e.currentTarget.duration;
+                setAudioDuration(Number.isFinite(duration) && duration >= 0 ? duration : 0);
+              }}
               onEnded={() => {
                 setIsPlaying(false);
                 setPlaybackTime(0);
@@ -222,10 +214,23 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
             />
           </div>
         )}
+        {(isRecording || audioUrl) && (formatTime(isRecording ? recordingDuration : playbackTime) || formatTime(recordingDuration)) && (
+          <div className="text-2xl font-bold tracking-wider text-[var(--text-primary)] font-mono tabular-nums" aria-label="Recording duration">
+            {formatTime(isRecording ? recordingDuration : playbackTime) || formatTime(recordingDuration)}
+          </div>
+        )}
+        <div className={`flex h-9 items-center gap-1.5 transition-opacity ${isRecording ? 'opacity-100' : 'opacity-25'}`} aria-hidden="true">
+          {[4, 8, 6, 10, 5, 9, 7, 3, 8, 6, 4].map((height, index) => (
+            <span key={index} className={`w-1 rounded-full bg-[var(--text-primary)] ${isRecording ? 'animate-pulse' : ''}`} style={{ height: `${height * 4}px`, animationDelay: `${index * 75}ms` }} />
+          ))}
+        </div>
       </div>
 
-      <div className="mt-3 flex flex-col items-start gap-2 text-xs text-[var(--text-muted)] sm:flex-row sm:items-center sm:justify-between">
-        <span>High-fidelity browser audio capture</span>
+      <div className="mt-3 flex items-center justify-center gap-1 whitespace-nowrap text-xs text-[var(--text-muted)]">
+        <span>Alternate input:</span>
+        <button type="button" onClick={onUploadAudio} disabled={disabled} className="min-h-10 px-1 font-semibold text-[#315f9f] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] disabled:opacity-50 dark:text-[#8AB4FF]">Upload Audio</button>
+        <span>or</span>
+        <button type="button" onClick={onRequestTextEntry} disabled={disabled} className="min-h-10 px-1 font-semibold text-[#315f9f] underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8AB4FF] disabled:opacity-50 dark:text-[#8AB4FF]">Paste Text</button>
         {isRecording && <span className="text-[#d1495b] font-semibold animate-pulse">● Live Recording</span>}
       </div>
     </div>

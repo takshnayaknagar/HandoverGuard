@@ -22,34 +22,38 @@ EXTRACTION RULES (follow exactly):
 1. Use only information explicitly stated in the transcript. Never invent
    patient identifiers, clinical facts, diagnoses, medications, dosages,
    results, or completed tasks.
-2. patient_reference: copy the patient or bed reference ONLY if the transcript
-   explicitly provides one (e.g. "bed 4", "Mr A"). Otherwise use null.
-3. completed: only actions the transcript explicitly reports as already done
+2. patient_reference: copy the patient name or other patient reference ONLY if
+   the transcript explicitly provides one (e.g. "Mr A"). Do not put a bed
+   number in this field.
+3. patient_bed: copy the bed number or identifier ONLY when the transcript
+   explicitly states it (e.g. "Bed 4" or "in bed 2"). Return null when no bed
+   is stated. Never infer or guess a bed number.
+4. completed: only actions the transcript explicitly reports as already done
    (given, administered, completed, reviewed, handed over, etc.). Mentioning a
    task does NOT mean it was completed.
-4. pending: only tasks or results the transcript explicitly states are still
+5. pending: only tasks or results the transcript explicitly states are still
    outstanding or awaiting something (pending, awaiting, not yet, planned for
    later today, etc.).
-5. follow_up: only explicitly stated follow-up actions, appointments, reviews,
+6. follow_up: only explicitly stated follow-up actions, appointments, reviews,
    or monitoring to happen later (tomorrow, next week, "review", "monitor").
-6. communication: only explicitly stated communications or handover
+7. communication: only explicitly stated communications or handover
    instructions involving people (family updated, informed the registrar,
    discussed with the ward team).
-7. unclear_or_undocumented: list ambiguities, contradictions, or important
+8. unclear_or_undocumented: list ambiguities, contradictions, or important
    gaps that need human verification — including vague or incomplete
    medication instructions, missing times or doses, and conflicting statements.
    When in doubt, flag it here instead of guessing.
-8. An empty list means the category was not documented in the transcript. It
+9. An empty list means the category was not documented in the transcript. It
    never means "nothing outstanding". Do not fill gaps with assumptions.
-9. Preserve dates, times, names, and details exactly as stated.
-10. Do not repeat an item. Never list the same statement twice in one
+10. Preserve dates, times, names, and details exactly as stated.
+11. Do not repeat an item. Never list the same statement twice in one
     category, and never place the same statement in two different
     categories — assign it to the single best-fitting category only.
-11. Be exhaustive, not selective: include EVERY statement the transcript
+12. Be exhaustive, not selective: include EVERY statement the transcript
     explicitly makes in its matching category. Do not omit any stated task,
     result, or communication. If you are unsure where something belongs,
     put it in unclear_or_undocumented rather than dropping it.
-12. Every item must be traceable to the transcript's own wording: quote or
+13. Every item must be traceable to the transcript's own wording: quote or
     closely paraphrase what was said. Never add clinical details, values,
     quantities, or qualifiers that the transcript does not contain.
 

@@ -6,7 +6,6 @@ import {
   MessageSquare, 
   AlertTriangle,
   User,
-  AlertCircle
 } from 'lucide-react';
 import type { HandoverItem } from '../types/handover';
 
@@ -18,6 +17,8 @@ interface CategoryCardProps {
   badgeStyle: string;
   cardBorderStyle: string;
   headerBgStyle: string;
+  accentStyle: string;
+  iconBgStyle: string;
 }
 
 export const CategoryCard: React.FC<CategoryCardProps> = ({
@@ -26,8 +27,10 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({
   items,
   icon,
   badgeStyle,
-  cardBorderStyle,
-  headerBgStyle
+  cardBorderStyle: _cardBorderStyle,
+  headerBgStyle: _headerBgStyle,
+  accentStyle,
+  iconBgStyle
 }) => {
   const getUrgencyBadge = (urgency?: HandoverItem['urgency']) => {
     switch (urgency) {
@@ -43,14 +46,15 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({
   };
 
   return (
-    <div className={`flex flex-col overflow-hidden rounded-2xl border ${cardBorderStyle} bg-[var(--bg-card)] transition-colors duration-200`}>
+    <div className="relative flex flex-col overflow-hidden rounded-2xl border border-[var(--border-main)] bg-[var(--bg-card)] shadow-sm transition-colors duration-200">
+      <span aria-hidden="true" className={`absolute inset-y-0 left-0 z-10 w-1 rounded-l-2xl ${accentStyle}`} />
       {/* Card Header */}
-      <div className={`px-4 py-3.5 sm:px-5 sm:py-4 border-b ${headerBgStyle} flex items-center justify-between gap-3`}>
-        <div className="flex items-center gap-2.5">
-          <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card-muted)] p-1.5">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border-main)] bg-[var(--bg-card)] px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div className={`rounded-lg p-2 [&>svg]:!text-[#191c1e] ${iconBgStyle}`}>
             {icon}
           </div>
-          <h3 className="font-bold text-[var(--text-primary)] text-sm sm:text-base">{title}</h3>
+          <h3 className="truncate font-bold text-[var(--text-primary)] text-sm sm:text-base">{title}</h3>
         </div>
         <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${badgeStyle}`}>
           {items.length} {items.length === 1 ? 'item' : 'items'}
@@ -58,16 +62,16 @@ export const CategoryCard: React.FC<CategoryCardProps> = ({
       </div>
 
       {/* Card Body / Items */}
-      <div className="p-3.5 sm:p-4 flex-1 flex flex-col gap-3 divide-y divide-[var(--border-main)]">
+      <div className="flex flex-1 flex-col gap-3 p-3.5 sm:p-4">
         {items.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[var(--border-main)] bg-[var(--bg-card-muted)]/50 px-3 py-6 text-center text-[var(--text-muted)] text-xs italic">
+          <div className="rounded-xl border border-dashed border-[var(--border-main)] bg-[var(--bg-card-muted)]/50 px-3 py-5 text-center text-xs leading-relaxed text-[var(--text-muted)]">
             No {title.toLowerCase()} information was documented in the provided handover. This does not confirm that no action is outstanding.
           </div>
         ) : (
           items.map((item) => (
-            <div key={item.id} className="pt-3 first:pt-0 group">
+            <div key={item.id} className="group rounded-xl border border-[var(--border-main)] bg-[var(--bg-card-muted)]/45 p-3">
               <div className="flex items-start justify-between gap-2">
-                <h4 className="break-words text-sm font-semibold text-[var(--text-primary)] transition-colors group-hover:text-[#315f9f] dark:group-hover:text-[#8AB4FF]">
+                <h4 className="break-words text-sm font-semibold leading-snug text-[var(--text-primary)] transition-colors group-hover:text-[#315f9f] dark:group-hover:text-[#8AB4FF]">
                   {item.title}
                 </h4>
                 {getUrgencyBadge(item.urgency)}
@@ -101,7 +105,7 @@ export const HandoverDashboardCards: React.FC<{ items: {
   verification: HandoverItem[];
 } }> = ({ items }) => {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:gap-5">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:gap-4">
       {/* Pending: explicit work not yet documented as completed. */}
       <CategoryCard
         category="pending"
@@ -111,6 +115,8 @@ export const HandoverDashboardCards: React.FC<{ items: {
         badgeStyle="bg-amber-500/10 text-amber-700 dark:text-amber-300"
         cardBorderStyle="border-amber-500/25"
         headerBgStyle="bg-amber-500/5 border-amber-500/15"
+        accentStyle="bg-amber-500"
+        iconBgStyle="bg-amber-300"
       />
 
       {/* Follow-up */}
@@ -122,6 +128,8 @@ export const HandoverDashboardCards: React.FC<{ items: {
         badgeStyle="bg-[#315f9f]/10 text-[#315f9f] dark:text-[#8AB4FF]"
         cardBorderStyle="border-[#315f9f]/25"
         headerBgStyle="bg-[#315f9f]/5 border-[#315f9f]/15"
+        accentStyle="bg-[#315f9f]"
+        iconBgStyle="bg-[#8AB4FF]"
       />
 
       {/* Completed */}
@@ -133,6 +141,8 @@ export const HandoverDashboardCards: React.FC<{ items: {
         badgeStyle="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
         cardBorderStyle="border-emerald-500/25"
         headerBgStyle="bg-emerald-500/5 border-emerald-500/15"
+        accentStyle="bg-emerald-700"
+        iconBgStyle="bg-emerald-300"
       />
 
       {/* Communication */}
@@ -144,6 +154,8 @@ export const HandoverDashboardCards: React.FC<{ items: {
         badgeStyle="bg-slate-500/10 text-slate-700 dark:text-slate-300"
         cardBorderStyle="border-slate-500/25"
         headerBgStyle="bg-slate-500/5 border-slate-500/15"
+        accentStyle="bg-slate-700"
+        iconBgStyle="bg-slate-300"
       />
 
       {/* Unclear or undocumented */}
@@ -155,20 +167,10 @@ export const HandoverDashboardCards: React.FC<{ items: {
         badgeStyle="bg-[#b54747]/10 text-[#b54747] dark:text-[#f08a8a]"
         cardBorderStyle="border-[#b54747]/25"
         headerBgStyle="bg-[#b54747]/5 border-[#b54747]/15"
+        accentStyle="bg-[#b54747]"
+        iconBgStyle="bg-[#f08a8a]"
       />
 
-      {/* AI output review reminder */}
-      <div className="rounded-2xl border border-[var(--border-card)] bg-[var(--bg-card-muted)] p-5 text-[var(--text-primary)] md:col-span-2">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="rounded-lg border border-[var(--border-main)] bg-[var(--bg-card)] p-2 text-[#315f9f] dark:text-[#8AB4FF]">
-            <AlertCircle className="w-5 h-5" />
-          </div>
-          <h3 className="font-semibold text-base text-[var(--text-primary)]">Review AI-Generated Items</h3>
-        </div>
-        <p className="text-xs leading-relaxed text-[var(--text-secondary)]">
-          AI organizes information from the provided notes into handover categories. Review the transcript and generated items for accuracy. Items marked <strong className="font-semibold text-[#b54747] dark:text-[#f08a8a]">Unclear / Undocumented</strong> may require clinician review.
-        </p>
-      </div>
     </div>
   );
 };

@@ -29,10 +29,10 @@ def test_password_hashing_and_safe_verification(monkeypatch, tmp_path):
 
 def test_duplicate_user_and_session_lifecycle(monkeypatch, tmp_path):
     monkeypatch.setattr(database, "DATABASE_PATH", tmp_path / "auth.db")
-    user_id = auth.create_user(" Demo@Example.com ", "a sufficiently long password")
-    assert auth.get_user_by_username("demo@example.com")["user_id"] == user_id
+    user_id = auth.create_user(" Staff-001 ", "a sufficiently long password")
+    assert auth.get_user_by_staff_id("staff-001")["user_id"] == user_id
     try:
-        auth.create_user("demo@example.com", "another sufficiently long password")
+        auth.create_user("staff-001", "another sufficiently long password")
     except ValueError as error:
         assert "already exists" in str(error)
     else:

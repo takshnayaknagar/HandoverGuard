@@ -30,7 +30,7 @@ from app.database import (
 )
 from app.auth import (
     create_session,
-    get_user_by_username,
+    get_user_by_staff_id,
     get_user_for_session,
     revoke_session,
     verify_password,
@@ -65,7 +65,7 @@ SESSION_COOKIE = "handoverguard_session"
 
 
 class LoginRequest(BaseModel):
-    username: str = Field(min_length=1, max_length=320)
+    staff_id: str = Field(min_length=1, max_length=128)
     password: str = Field(min_length=1, max_length=256)
 
 
@@ -120,9 +120,9 @@ def health() -> dict[str, str]:
 @app.post("/login")
 def login(payload: LoginRequest, request: Request, response: Response) -> dict:
     _check_origin(request)
-    user = get_user_by_username(payload.username)
+    user = get_user_by_staff_id(payload.staff_id)
     if user is None or not user["is_active"] or not verify_password(payload.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="Invalid Staff ID or password")
     token, expires_at = create_session(user["user_id"])
     response.set_cookie(
         SESSION_COOKIE,
@@ -134,7 +134,7 @@ def login(payload: LoginRequest, request: Request, response: Response) -> dict:
         max_age=int((expires_at - datetime.now(timezone.utc)).total_seconds()),
         path="/",
     )
-    return {"user_id": user["user_id"], "username": user["username"]}
+    return {"user_id": user["user_id"], "staff_id": user["username"]}
 
 
 @app.post("/logout")
@@ -148,7 +148,7 @@ def logout(request: Request, response: Response) -> dict:
 
 @app.get("/me")
 def me(user: dict = Depends(_current_user)) -> dict:
-    return {"user_id": user["user_id"], "username": user["username"]}
+    return {"user_id": user["user_id"], "staff_id": user["username"]}
 
 
 # --- Process and save a handover ----------------------------------------------
@@ -186,7 +186,12 @@ def process_handover(
         result = process_transcript_with_llm(transcript)
 
         # Save only a successfully generated, validated handover.
-        case_id = save_handover(transcript, result.model_dump(), owner_id=user["user_id"])
+        result_data = result.model_dump()
+        # An explicitly entered bed takes precedence; otherwise retain the
+        # bed extracted from the transcript rather than erasing it.
+        manual_bed = payload.patient_bed.strip() if payload.patient_bed and payload.patient_bed.strip() else None
+        result_data["patient_bed"] = manual_bed or result.patient_bed
+        case_id = save_handover(transcript, result_data, owner_id=user["user_id"])
         saved_record = get_handover(case_id, owner_id=user["user_id"])
 
         if saved_record is None:
@@ -194,6 +199,7 @@ def process_handover(
 
         # Return the saved record's exact metadata with the clinical result.
         response = result.model_dump()
+        response["patient_bed"] = result_data["patient_bed"]
         response["case_id"] = case_id
         response["created_at"] = saved_record["created_at"]
         return response
