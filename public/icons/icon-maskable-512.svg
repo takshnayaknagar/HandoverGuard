@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">HandoverGuard</title>
+  <rect width="512" height="512" fill="#050505"/>
+  <path d="M256 108 365 148v94c0 76-45 136-109 174-64-38-109-98-109-174v-94l109-40Z" fill="#8AB4FF"/>
+  <path d="M256 168v170M192 253h128" stroke="#050505" stroke-width="30" stroke-linecap="round"/>
+</svg>
